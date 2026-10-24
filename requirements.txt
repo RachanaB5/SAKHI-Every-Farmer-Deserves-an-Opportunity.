@@ -1,0 +1,7 @@
+# Python tools (optional): build Sakhi's Kannada / Hindi voice models
+# (npm run voice:kannada, npm run voice:hindi). The web app needs only Node.
+# pip install -r requirements.txt
+numpy>=1.26
+torch>=2.4
+onnx>=1.16
+onnxruntime>=1.19
