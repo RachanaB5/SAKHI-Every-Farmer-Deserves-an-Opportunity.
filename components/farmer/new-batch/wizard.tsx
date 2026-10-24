@@ -15,7 +15,7 @@ import { useI18n } from "@/components/providers/i18n-provider";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import type { SerializedBatch, SerializedMedia } from "@/lib/batches";
-import { isCropSlug, type CropSlug } from "@/lib/crops";
+import { CROP_SLUGS, cropName, type CropSlug } from "@/lib/crops";
 import { fetcher, sendJSON } from "@/lib/fetcher";
 import { uploadWithProgress } from "@/lib/upload";
 import { extractFrames } from "@/lib/video-frames";
@@ -25,7 +25,6 @@ import { PriceStep } from "./price-step";
 import { QualityCard, QualityPanel, type QualityState } from "./quality-panel";
 import { ReviewStep } from "./review-step";
 import { StepIndicator } from "./step-indicator";
-import { VoiceCapture, type ParsedListingResult } from "./voice-capture";
 import { isoDaysAgo, type DraftFields, type UploadTile } from "./types";
 
 /** Blank form; computed per use so "today" is the farmer's today, not the module-load day. */
@@ -77,7 +76,7 @@ function fromBatch(b: SerializedBatch): { fields: DraftFields; tiles: UploadTile
  * @param initial - an editable batch to resume (draft or "needs changes")
  */
 export function NewBatchWizard({ farmerCrops, initial }: { farmerCrops: CropSlug[]; initial?: SerializedBatch | null }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const resumed = initial ? fromBatch(initial) : null;
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
@@ -113,19 +112,6 @@ export function NewBatchWizard({ farmerCrops, initial }: { farmerCrops: CropSlug
     transcript: fields.transcript || undefined,
     inputLanguage: fields.inputLanguage || undefined,
   });
-
-  /** Applies voice-extracted values as a draft; nothing is saved until the farmer continues. */
-  function applyParsed(r: ParsedListingResult, transcript: string, lang: string) {
-    const patch: Partial<DraftFields> = { transcript, inputLanguage: lang };
-    if (r.crop && isCropSlug(r.crop)) patch.crop = r.crop;
-    if (r.qty) patch.quantity = String(r.qty);
-    if (r.unit) patch.unit = r.unit;
-    if (r.harvestDate) patch.harvestDate = r.harvestDate;
-    if (r.price) patch.price = String(r.price);
-    setFields((f) => ({ ...f, ...patch }));
-    // Highlight anything the farmer still has to fill in (price is asked on step 3).
-    setMissing(r.missing.filter((m) => m !== "unit" && m !== "price"));
-  }
 
   function validateDetails(): boolean {
     const gaps: string[] = [];
@@ -235,6 +221,19 @@ export function NewBatchWizard({ farmerCrops, initial }: { farmerCrops: CropSlug
     }
   }
 
+  /** The photos look like another crop: switch the harvest to it and clear the old check. */
+  async function switchCrop(crop: CropSlug) {
+    set({ crop });
+    setQuality(null);
+    if (!batchId) return;
+    try {
+      await sendJSON(`/api/batches/${batchId}`, { action: "save", ...payload(), crop }, "PATCH");
+      toast.success(t("vision.cropChanged", { crop: cropName(crop, lang) }));
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
   async function removeTile(tile: UploadTile) {
     setQuality(null);
     setTiles((ts) => ts.filter((x) => x.key !== tile.key));
@@ -254,7 +253,7 @@ export function NewBatchWizard({ farmerCrops, initial }: { farmerCrops: CropSlug
   }} />;
 
   const steps = [t("batch.stepDetails"), t("batch.stepMedia"), t("batch.stepPrice"), t("batch.stepReview")];
-  const crops = [...farmerCrops, ...(["tomato", "onion", "potato", "spinach", "carrot", "beans", "brinjal", "cabbage", "milk", "eggs", "chicken"] as CropSlug[]).filter((c) => !farmerCrops.includes(c))];
+  const crops = [...farmerCrops, ...CROP_SLUGS.filter((c) => !farmerCrops.includes(c))];
 
   return (
     <div>
@@ -275,16 +274,18 @@ export function NewBatchWizard({ farmerCrops, initial }: { farmerCrops: CropSlug
           exit={{ opacity: 0, x: dir * -36, filter: "blur(4px)" }}
           transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
         >
-          {step === 0 && (
-            <DetailsStep fields={fields} set={set} missing={missing} cropOrder={crops} voice={<VoiceCapture onParsed={applyParsed} />} />
-          )}
+          {step === 0 && <DetailsStep fields={fields} set={set} missing={missing} cropOrder={crops} />}
           {step === 1 && (
             <MediaStep
               tiles={tiles}
               onFiles={(f) => addFiles(f)}
               onRemove={removeTile}
               busyLabel={framing}
-              extra={tiles.some((x) => x.status === "done") && <QualityPanel batchId={batchId} tiles={tiles} result={quality} onResult={setQuality} />}
+              extra={
+                tiles.some((x) => x.status === "done") && (
+                  <QualityPanel batchId={batchId} tiles={tiles} result={quality} onResult={setQuality} crop={fields.crop} onUseCrop={switchCrop} />
+                )
+              }
             />
           )}
           {step === 2 && (
@@ -303,7 +304,7 @@ export function NewBatchWizard({ farmerCrops, initial }: { farmerCrops: CropSlug
               }
             />
           )}
-          {step === 3 && <ReviewStep fields={fields} tiles={tiles} quality={quality && <QualityCard result={quality} compact />} />}
+          {step === 3 && <ReviewStep fields={fields} tiles={tiles} quality={quality && <QualityCard result={quality} compact crop={fields.crop} />} />}
         </motion.div>
       </AnimatePresence>
 

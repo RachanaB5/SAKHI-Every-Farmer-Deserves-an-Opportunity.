@@ -6,14 +6,13 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { isCropSlug } from "@/lib/crops";
 import type { Lang } from "@/lib/i18n";
-import { geminiFromEnv, isOutage } from "./gemini";
+import { GeminiHttpError, geminiFromEnv, isOutage } from "./gemini";
 import { AIUnavailableError, type AIImage, type AIProvider } from "./provider";
 import {
   groceryPrompt,
   parseDemandPrompt,
   parseListingPrompt,
   priceExplainPrompt,
-  qualityPrompt,
 } from "./prompts";
 import {
   QUALITY_DISCLAIMER,
@@ -21,7 +20,6 @@ import {
   parsedDemandSchema,
   parsedListingSchema,
   priceExplanationSchema,
-  qualitySchema,
   type AIResult,
   type GroceryList,
   type ParsedDemand,
@@ -31,7 +29,18 @@ import {
 import { parseDemandFallback } from "./fallback/demand-parser";
 import { SAMPLE_GROCERY_LIST, parseGroceryFallback } from "./fallback/grocery-parser";
 import { isoDay, parseListingFallback } from "./fallback/listing-parser";
-import { qualityHeuristic } from "./fallback/quality-heuristic";
+import {
+  askGemini,
+  checkPhotos,
+  gradePhotos,
+  overallPhotoConfidence,
+  readCheck,
+  sharedIssues,
+  unavailableGrade,
+  type CropMatch,
+  type Detected,
+  type PhotoReading,
+} from "./vision";
 
 // Circuit breaker: after a few outages in a row (timeouts, HTTP errors, no
 // network) skip the model for a minute, so users get the instant offline
@@ -75,7 +84,16 @@ export async function withFallback<T>(
       breaker.openUntil = Date.now() + BREAKER_COOLDOWN_MS;
       breaker.failures = 0;
     }
-    const note = err.name === "TimeoutError" || err.name === "AbortError" ? "AI timed out" : err instanceof AIUnavailableError ? err.message : "AI response unusable";
+    const note =
+      err.name === "TimeoutError" || err.name === "AbortError"
+        ? "AI timed out"
+        : err instanceof AIUnavailableError
+          ? err.message
+          : err instanceof GeminiHttpError
+            ? err.status === 429
+              ? "AI is busy (request limit reached)"
+              : `AI service error (${err.status})`
+            : "AI response unusable";
     console.warn(`[ai:${task}] using fallback, ${err.message}`);
     return { data: await fallback(), source: "fallback", note };
   }
@@ -112,18 +130,24 @@ export function clearAIAnswers() {
   answers.clear();
 }
 
-/** Grade is always derived from the score so model output can't contradict itself. */
-function gradeFor(score: number): "A" | "B" | "C" {
-  return score >= 85 ? "A" : score >= 70 ? "B" : "C";
-}
-
 // Small LRU so preview + submit of the same frames give the same answer and cost one call.
 const qualityCache = new Map<string, AIResult<QualityResult>>();
 
-export type QualityResult = QualityCore & { disclaimer: string };
+export interface QualityResult extends QualityCore {
+  disclaimer: string;
+  /** 0–1: how far the score can be trusted (photo sharpness / light). Sets how fast reviews move it. */
+  confidence: number;
+  /** What the photos show; null when that couldn't be told. */
+  detected: Detected | null;
+  /** Declared crop vs photos (null when unknown). */
+  match: CropMatch | null;
+}
 
 /**
- * Visual quality check of 1–4 harvest photos/frames.
+ * Visual quality check of 1–4 harvest photos/frames by Gemini. A score is
+ * given only when the photos clearly show the declared produce; otherwise,
+ * and whenever Gemini isn't available, the result is "not detectable" (score
+ * and grade null) with the reason. Photo quality never changes a score.
  * @param frames - image bytes with their MIME types
  * @param crop - declared crop slug, if known
  */
@@ -138,25 +162,38 @@ export async function assessQuality(
   const cached = qualityCache.get(cacheKey);
   if (cached) return cached;
 
+  const checks = await checkPhotos(frames.map((f) => f.bytes)).catch(() => []);
+  const issues = sharedIssues(checks);
   const images: AIImage[] = frames.map((f) => ({ mimeType: f.mimeType, base64: f.bytes.toString("base64") }));
-  const result = await withFallback<QualityCore>(
-    "quality",
-    async (p) => {
-      const out = await p.generateJSON({
-        task: "quality",
-        system: qualityPrompt.system,
-        prompt: qualityPrompt.user(crop ?? null, frames.length),
-        images,
-        schema: qualitySchema,
-      });
-      return { ...out, grade: gradeFor(out.score) };
+  const result = await withFallback<PhotoReading | null>("photo-check", async (p) => readCheck(await askGemini(p, images, crop), crop), () => null);
+  const reading = result.data;
+  const core = reading ? gradePhotos(reading, crop, issues) : unavailableGrade(issues);
+  const final: AIResult<QualityResult> = {
+    ...result,
+    data: {
+      ...core,
+      disclaimer: QUALITY_DISCLAIMER,
+      // An ungraded check gives the review loop nothing to hold on to.
+      confidence: core.score === null ? 0 : overallPhotoConfidence(checks),
+      detected: reading?.detected ?? null,
+      match: reading?.match ?? null,
     },
-    () => qualityHeuristic(frames.map((f) => f.bytes), crop),
-  );
-  const final: AIResult<QualityResult> = { ...result, data: { ...result.data, disclaimer: QUALITY_DISCLAIMER } };
-  qualityCache.set(cacheKey, final);
-  if (qualityCache.size > 200) qualityCache.delete(qualityCache.keys().next().value!);
+  };
+  // Only real answers are remembered, so a recovered Gemini is used at once.
+  if (reading) {
+    qualityCache.set(cacheKey, final);
+    if (qualityCache.size > 200) qualityCache.delete(qualityCache.keys().next().value!);
+  }
   return final;
+}
+
+/**
+ * What Gemini sees in photos (e.g. a buyer's review photo), or null when
+ * Gemini isn't available or the answer was unusable.
+ */
+export async function readPhotos(frames: { bytes: Buffer; mimeType: string }[], crop?: string | null): Promise<PhotoReading | null> {
+  const images: AIImage[] = frames.map((f) => ({ mimeType: f.mimeType, base64: f.bytes.toString("base64") }));
+  return (await withFallback<PhotoReading | null>("photo-check", async (p) => readCheck(await askGemini(p, images, crop), crop), () => null)).data;
 }
 
 /** Recomputes `missing` and drops crops outside the catalogue. */

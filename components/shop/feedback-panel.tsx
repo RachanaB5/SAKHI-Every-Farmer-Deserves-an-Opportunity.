@@ -1,6 +1,8 @@
-// Post-delivery feedback: animated star rating, quality-issue chips,
-// comment and optional photo. A low rating with an issue opens a dispute
-// that FoodFlow's team reviews (refunds are handled by admins).
+// Post-delivery feedback: animated star rating, quality-issue chips, which
+// item it's about (multi-item orders), comment and optional photo. Reviews
+// move the item's live grade; a photo is checked by our vision model and a
+// photo-backed complaint counts more. A low rating with an issue opens a
+// dispute that FoodFlow's team reviews (refunds are handled by admins).
 "use client";
 
 import { Camera, Check, Loader2, Star, X } from "lucide-react";
@@ -13,6 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { sendForm } from "@/lib/fetcher";
 import type { SerializedOrder } from "@/lib/orders/queries";
 import { cn } from "@/lib/utils";
+
+/** Issues about the produce itself, where a photo helps most. */
+const PRODUCE_ISSUES = ["NOT_FRESH", "DAMAGED", "WRONG_ITEM"];
 
 const ISSUES = [
   { v: "NONE", l: "All good" },
@@ -28,6 +33,7 @@ export function FeedbackPanel({ order, onDone }: { order: SerializedOrder; onDon
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [issue, setIssue] = useState("NONE");
+  const [itemId, setItemId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -49,7 +55,13 @@ export function FeedbackPanel({ order, onDone }: { order: SerializedOrder; onDon
             <Star key={i} className={cn("size-5", i < order.feedback!.rating ? "fill-warning text-warning" : "text-muted-foreground/30")} />
           ))}
         </div>
-        {order.feedback.issue && order.feedback.issue !== "NONE" && <p className="mt-2 text-sm">Reported: {ISSUES.find((x) => x.v === order.feedback!.issue)?.l}</p>}
+        {order.feedback.issue && order.feedback.issue !== "NONE" && (
+          <p className="mt-2 text-sm">
+            Reported: {ISSUES.find((x) => x.v === order.feedback!.issue)?.l}
+            {order.feedback.listingId && <span className="text-muted-foreground"> · {order.items.find((i) => i.listingId === order.feedback!.listingId)?.title}</span>}
+          </p>
+        )}
+        {order.feedback.photoVerdict === "supports" && <p className="mt-1 text-xs text-muted-foreground">Your photo backed this up, so it counts more towards the farm&apos;s grade.</p>}
         {order.feedback.comment && <p className="mt-1 text-sm text-muted-foreground">“{order.feedback.comment}”</p>}
         {order.status === "DISPUTED" && <p className="mt-2 rounded-xl bg-warning/12 p-2 text-sm">Our team is reviewing this, you&apos;ll hear back within 24 hours.</p>}
       </section>
@@ -65,6 +77,7 @@ export function FeedbackPanel({ order, onDone }: { order: SerializedOrder; onDon
       form.append("issue", issue);
       if (comment) form.append("comment", comment);
       if (photo) form.append("photo", photo);
+      if (itemId) form.append("listingId", itemId);
       const r = await sendForm<{ disputed: boolean }>(`/api/orders/${order.id}/feedback`, form);
       toast.success(r.disputed ? "Thanks, we've opened a case and will refund if needed" : "Thanks for rating your farmer!");
       onDone();
@@ -76,6 +89,7 @@ export function FeedbackPanel({ order, onDone }: { order: SerializedOrder; onDon
   }
 
   const shown = hover || rating;
+  const items = [...new Map(order.items.map((i) => [i.listingId, i])).values()];
   return (
     <section className="rounded-3xl border bg-card p-5">
       <p className="font-semibold">How was it?</p>
@@ -111,6 +125,23 @@ export function FeedbackPanel({ order, onDone }: { order: SerializedOrder; onDon
                 </button>
               ))}
             </div>
+            {issue !== "NONE" && items.length > 1 && (
+              <div className="mt-3">
+                <p className="text-sm font-medium">Which item?</p>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  {[{ listingId: null, title: "Everything" }, ...items].map((i) => (
+                    <button
+                      key={i.listingId ?? "all"}
+                      type="button"
+                      onClick={() => setItemId(i.listingId)}
+                      className={cn("min-h-10 rounded-full border px-3 text-sm", itemId === i.listingId && "border-foreground bg-foreground text-background")}
+                    >
+                      {i.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <Textarea className="mt-3" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Anything to add? (optional)" maxLength={500} />
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {photo && preview ? (
@@ -132,6 +163,7 @@ export function FeedbackPanel({ order, onDone }: { order: SerializedOrder; onDon
                 {busy ? <Loader2 className="animate-spin" /> : <Check />} Submit
               </Button>
             </div>
+            {PRODUCE_ISSUES.includes(issue) && !photo && <p className="mt-2 text-xs text-muted-foreground">A photo of the produce helps: complaints with a photo count more towards the farm&apos;s quality grade.</p>}
             {rating <= 2 && issue !== "NONE" && <p className="mt-2 text-xs text-muted-foreground">This opens a case with FoodFlow. If the produce wasn&apos;t right, we refund you.</p>}
           </motion.div>
         )}

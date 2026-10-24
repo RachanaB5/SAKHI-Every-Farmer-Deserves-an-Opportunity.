@@ -3,20 +3,26 @@
 // sprout answers with real data, asks before changing anything, and
 // greets new farmers once in their language. After a voice sign-up it opens
 // by itself and walks the farmer through their first harvest, hands-free.
+// With "Let Sakhi handle my orders" on, it also opens by itself for order
+// news and pins whoever is waiting at the farm above the conversation.
 "use client";
 
-import { Check, Mic, MicOff, Repeat, Send, Settings2, Square, X } from "lucide-react";
+import { Bike, Check, Loader2, Mic, MicOff, Repeat, ScanLine, Send, Settings2, Square, Store, X } from "lucide-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { ClientOnly } from "@/components/common/client-only";
+import { OtpKeypad } from "@/components/delivery/otp-keypad";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { useIsDesktop } from "@/hooks/use-media-query";
+import { itemsText } from "@/lib/assistant/agent-text";
+import type { AgentTask } from "@/lib/assistant/autopilot";
 import type { AssistantLang } from "@/lib/assistant/intents";
 import { clearJourney, peekJourney } from "@/lib/assistant/journey";
 import { createStt } from "@/lib/assistant/stt";
@@ -26,12 +32,14 @@ import { translate, type Lang, type MessageKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { FarmerFriendAvatar } from "./avatar";
 import { MessageCard } from "./cards";
+import { useAgent, type Agent } from "./use-agent";
 import { useFarmerFriend, type JourneyStage } from "./use-farmer-friend";
 import { VoiceSettings } from "./voice-settings";
 
 interface Settings {
   welcomeSeen: boolean;
   autoVoice: boolean;
+  autopilot: boolean;
   language: string;
   suggested: AssistantLang[];
 }
@@ -81,7 +89,33 @@ function FarmerFriendInner() {
   const [welcomeDone, setWelcomeDone] = useState(() => journey !== null);
   const [replayWelcome, setReplayWelcome] = useState(false);
   const autoVoice = settings?.autoVoice ?? true;
-  const ff = useFarmerFriend({ autoVoice });
+  // The order autopilot answers "yes" / a buyer's code before Sakhi's usual understanding.
+  const intercept = useRef<(text: string) => Promise<boolean>>(async () => false);
+  const ff = useFarmerFriend({ autoVoice, intercept });
+
+  // Order news opens the panel by itself, even if the farmer had hidden Sakhi.
+  const wake = useCallback(() => {
+    store.set(HIDDEN_KEY, null);
+    setHidden(false);
+    setUserOpen(true);
+  }, []);
+  const agent = useAgent({ enabled: settings?.autopilot ?? false, ff, onWake: wake });
+  useEffect(() => {
+    intercept.current = agent.intercept;
+  });
+
+  const { agentSay, speakLang } = ff;
+  const toggleAutopilot = useCallback(
+    async (on: boolean) => {
+      try {
+        await mutate(await sendJSON<Settings>("/api/assistant/settings", { autopilot: on }, "PATCH"), { revalidate: false });
+        agentSay(translate(speakLang, on ? "ff.autopilot.on" : "ff.autopilot.off"));
+      } catch (e) {
+        agentSay(`${translate(speakLang, "ff.say.error")} (${(e as Error).message})`, { ok: false });
+      }
+    },
+    [agentSay, mutate, speakLang],
+  );
 
   const { beginJourney } = ff;
   const journeyStarted = useRef(false);
@@ -122,6 +156,8 @@ function FarmerFriendInner() {
   const panel = (
     <Panel
       ff={ff}
+      agent={agent}
+      onToggleAutopilot={toggleAutopilot}
       settings={settings}
       showWelcome={showWelcome}
       onWelcomeDone={() => {
@@ -162,6 +198,11 @@ function FarmerFriendInner() {
             )}
           >
             <FarmerFriendAvatar state={ff.avatar === "speaking" ? "speaking" : "idle"} word={ff.word} size={52} />
+            {agent.tasks.length > 0 && (
+              <span className="absolute -top-1 -right-1 grid h-6 min-w-6 place-items-center rounded-full bg-tomato px-1.5 text-xs font-bold text-white" aria-hidden>
+                {agent.tasks.length}
+              </span>
+            )}
           </motion.button>
         )}
       </AnimatePresence>
@@ -200,6 +241,8 @@ type FF = ReturnType<typeof useFarmerFriend>;
 
 function Panel({
   ff,
+  agent,
+  onToggleAutopilot,
   settings,
   showWelcome,
   onWelcomeDone,
@@ -209,6 +252,8 @@ function Panel({
   onHide,
 }: {
   ff: FF;
+  agent: Agent;
+  onToggleAutopilot: (on: boolean) => void;
   settings: Settings | undefined;
   showWelcome: boolean;
   onWelcomeDone: () => void;
@@ -265,6 +310,13 @@ function Panel({
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="max-h-[70vh] w-72 space-y-3 overflow-y-auto">
+            <label className="flex min-h-11 items-start justify-between gap-3 text-sm">
+              <span>
+                <span className="font-medium">{t("ff.autopilot")}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">{t("ff.autopilot.help")}</span>
+              </span>
+              <Switch checked={settings?.autopilot ?? false} onCheckedChange={onToggleAutopilot} className="mt-0.5" />
+            </label>
             <label className="flex min-h-11 items-center justify-between gap-3 text-sm">
               {t("ff.autoVoice")}
               <Switch checked={settings?.autoVoice ?? true} onCheckedChange={onToggleVoice} />
@@ -293,6 +345,7 @@ function Panel({
       </div>
 
       {ff.journey && <JourneyStrip stage={ff.journey} />}
+      {agent.tasks.length > 0 && <TaskStrip agent={agent} />}
 
       {/* Language */}
       <div className="flex items-center gap-1.5 border-b px-4 py-2" role="radiogroup" aria-label={t("menu.language")}>
@@ -508,6 +561,68 @@ function JourneyStrip({ stage }: { stage: JourneyStage }) {
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+/** Who is at the farm right now (order autopilot): hand over to the rider, or check the buyer's code. */
+function TaskStrip({ agent }: { agent: Agent }) {
+  const { t } = useI18n();
+  return (
+    <div className="max-h-[45%] space-y-2 overflow-y-auto border-b bg-lime/10 px-4 py-3">
+      <p className="text-xs font-semibold">{t("ff.agent.title")}</p>
+      {agent.tasks.map((task) => (
+        <TaskCard key={task.orderId} task={task} agent={agent} />
+      ))}
+    </div>
+  );
+}
+
+function TaskCard({ task, agent }: { task: AgentTask; agent: Agent }) {
+  const { t, lang } = useI18n();
+  const [keypad, setKeypad] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [shake, setShake] = useState(0);
+  const busy = agent.busyOrder === task.orderId;
+
+  async function submit(code: string) {
+    if (task.kind !== "pickup") return;
+    if (!(await agent.checkCode(task, code))) {
+      setOtp("");
+      setShake((s) => s + 1);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border bg-card p-3">
+      <div className="flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-lime text-lime-foreground">{task.kind === "handover" ? <Bike className="size-4" /> : <Store className="size-4" />}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">{task.kind === "handover" ? t("ff.agent.task.rider", { rider: task.rider }) : t("ff.agent.task.buyer", { buyer: task.buyer })}</p>
+          <p className="font-mono text-lg font-semibold tracking-wide">{task.code}</p>
+          <p className="text-xs break-words text-muted-foreground">{itemsText(lang, task.items)}</p>
+        </div>
+      </div>
+      {task.kind === "handover" ? (
+        <Button variant="brand" className="mt-3 min-h-12 w-full text-base" disabled={busy} onClick={() => agent.handOver(task)}>
+          {busy ? <Loader2 className="animate-spin" /> : <Check />} {t("ff.agent.handedBtn")}
+        </Button>
+      ) : keypad ? (
+        <div className="mt-3">
+          <OtpKeypad value={otp} onChange={setOtp} onSubmit={submit} busy={busy} shakeKey={shake} />
+        </div>
+      ) : (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Button variant="brand" className="min-h-12" onClick={() => setKeypad(true)}>
+            {t("ff.agent.enterCode")}
+          </Button>
+          <Button asChild variant="outline" className="min-h-12">
+            <Link href={`/farmer/pickup?code=${task.code}`}>
+              <ScanLine /> {t("ff.agent.scanQr")}
+            </Link>
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

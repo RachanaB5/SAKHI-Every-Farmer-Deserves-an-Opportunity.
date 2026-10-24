@@ -1,9 +1,10 @@
-"""Builds Sakhi's Kannada voice: downloads SYSPIN's open Kannada female VITS
-model (IISc Bangalore, CC BY 4.0) from Hugging Face and exports it to ONNX
-so the Next.js server can speak Kannada with onnxruntime-node.
+"""Builds Sakhi's server voices: downloads SYSPIN's open female VITS model
+(IISc Bangalore, CC BY 4.0) for Kannada or Hindi from Hugging Face and exports
+it to ONNX so the Next.js server can speak with onnxruntime-node.
 
-    python scripts/kannada-voice/export.py            # → models/kn-female/
-    python scripts/kannada-voice/export.py --pt FILE  # reuse a downloaded .pt
+    python scripts/kannada-voice/export.py              # Kannada → models/kn-female/
+    python scripts/kannada-voice/export.py --lang hi    # Hindi   → models/hi-female/
+    python scripts/kannada-voice/export.py --pt FILE    # reuse a downloaded .pt
 
 Needs Python 3.10+ with `pip install torch onnx onnxruntime`. The export is
 checked before it is kept: every audio frame must align to exactly one
@@ -15,27 +16,62 @@ import os
 import re
 import shutil
 import sys
+import time
+import urllib.error
 import urllib.request
 
-REPO = "https://huggingface.co/SYSPIN/tts_vits_coquiai_KannadaFemale/resolve/main"
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT = os.path.join(ROOT, "models", "kn-female")
+VOICES = {
+    "kn": {
+        "name": "Kannada",
+        "repo": "tts_vits_coquiai_KannadaFemale",
+        "pt": "kn_female_vits_30hrs.pt",
+        "test": "ನಮಸ್ಕಾರ, ನಾನು ಸಖಿ. ನಿಮ್ಮ ಬೆಳೆಯನ್ನು ಮಾರಲು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.",
+    },
+    "hi": {
+        "name": "Hindi",
+        "repo": "tts_vits_coquiai_HindiFemale",
+        "pt": "hi_female_vits_30hrs.pt",
+        "test": "नमस्ते, मैं सखी हूँ। मैं आपकी फसल बेचने में मदद करती हूँ।",
+    },
+}
+REPO = OUT = ""
 
 
-def download(name, dest):
+def download(name, dest, attempts=30):
+    """Downloads with resume: a dropped connection continues from the bytes already saved."""
     if os.path.exists(dest):
         return
     print(f"downloading {name} …", flush=True)
     tmp = dest + ".part"
-    urllib.request.urlretrieve(f"{REPO}/{name}", tmp)
-    os.replace(tmp, dest)
+    for attempt in range(attempts):
+        have = os.path.getsize(tmp) if os.path.exists(tmp) else 0
+        req = urllib.request.Request(f"{REPO}/{name}", headers={"Range": f"bytes={have}-"} if have else {})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                resumed = r.status == 206
+                total = int(r.headers["Content-Range"].rsplit("/", 1)[1]) if resumed else int(r.headers.get("Content-Length", 0))
+                with open(tmp, "ab" if resumed else "wb") as f:
+                    shutil.copyfileobj(r, f, 1 << 20)
+            if total and os.path.getsize(tmp) >= total:
+                os.replace(tmp, dest)
+                return
+        except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as e:
+            print(f"  interrupted at {have / 1e6:.0f} MB ({e}), resuming …", flush=True)
+        time.sleep(min(30, 2 + attempt * 2))
+    sys.exit(f"could not download {name}; run again to resume")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pt", help="path to an already downloaded kn_female_vits_30hrs.pt")
+    ap.add_argument("--lang", choices=sorted(VOICES), default="kn", help="which voice to build (default: kn)")
+    ap.add_argument("--pt", help="path to an already downloaded *_female_vits_30hrs.pt")
     ap.add_argument("--keep", action="store_true", help="keep the 333 MB TorchScript file after export")
     args = ap.parse_args()
+    voice = VOICES[args.lang]
+    global REPO, OUT
+    REPO = f"https://huggingface.co/SYSPIN/{voice['repo']}/resolve/main"
+    OUT = os.path.join(ROOT, "models", f"{args.lang}-female")
 
     import numpy as np
     import onnx
@@ -49,9 +85,9 @@ def main():
         from torch.onnx._internal.torchscript_exporter import symbolic_helper as sh
 
     os.makedirs(OUT, exist_ok=True)
-    pt = args.pt or os.path.join(OUT, "kn_female_vits_30hrs.pt")
+    pt = args.pt or os.path.join(OUT, voice["pt"])
     if not args.pt:
-        download("kn_female_vits_30hrs.pt", pt)
+        download(voice["pt"], pt)
     download("chars.txt", os.path.join(OUT, "chars.txt"))
 
     # Vits.forward squeezes twice: duration = w_ceil.squeeze(1) on [B,1,Tx]
@@ -95,7 +131,7 @@ def main():
     letters = open(os.path.join(OUT, "chars.txt"), encoding="utf-8").read().strip("\n")
     vocab = ["<PAD>"] + list("!¡'(),-.:;¿? ") + list(letters) + ["<BLNK>"]
     ids = {c: k for k, c in enumerate(vocab)}
-    text = re.sub(r"\s+", " ", "ನಮಸ್ಕಾರ, ನಾನು ಸಖಿ. ನಿಮ್ಮ ಬೆಳೆಯನ್ನು ಮಾರಲು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.")
+    text = re.sub(r"\s+", " ", voice["test"])
     seq = [ids[c] for c in text if c in ids]
     x = [ids["<BLNK>"]] * (len(seq) * 2 + 1)
     x[1::2] = seq
@@ -113,13 +149,13 @@ def main():
 
     with open(os.path.join(OUT, "SOURCE.md"), "w", encoding="utf-8") as f:
         f.write(
-            "Kannada female VITS voice by SYSPIN (SPIRE Lab, IISc Bangalore),\n"
-            "https://huggingface.co/SYSPIN/tts_vits_coquiai_KannadaFemale, licensed CC BY 4.0.\n"
+            f"{voice['name']} female VITS voice by SYSPIN (SPIRE Lab, IISc Bangalore),\n"
+            f"https://huggingface.co/SYSPIN/{voice['repo']}, licensed CC BY 4.0.\n"
             "Converted to ONNX by scripts/kannada-voice/export.py.\n"
         )
     if not args.pt and not args.keep:
         os.remove(pt)
-    print("Kannada voice ready in", OUT)
+    print(f"{voice['name']} voice ready in", OUT)
 
 
 if __name__ == "__main__":

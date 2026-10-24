@@ -16,6 +16,7 @@ import { SiteFooter } from "@/components/common/site-footer";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { I18nProvider, useI18n } from "@/components/providers/i18n-provider";
 import { LanguageMenu, LanguageSwitch } from "@/components/shell/language-switch";
+import { NotificationBell } from "@/components/shell/notification-bell";
 import { AutoLocation, LocationPicker } from "@/components/shell/location-picker";
 import { useNavBadges } from "@/components/shell/use-nav-badges";
 import { UserMenu, useSignOut } from "@/components/shell/user-menu";
@@ -102,6 +103,7 @@ function ShellInner({ role, user, village, children }: { role: TopNavRole; user:
             </Suspense>
             <div className="ml-auto flex items-center gap-1 md:ml-0 md:gap-2">
               {config.localised && <LanguageMenu />}
+              {role === "FARMER" && <NotificationBell />}
               <ThemeToggle className="hidden md:inline-flex" />
               <UserMenu user={user} greeting />
               {config.cart && <CartLink count={badges.cart} />}

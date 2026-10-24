@@ -1,21 +1,22 @@
-// Farmer "My listings": live / paused / sold-out tabs with stock split
-// (sold · reserved · available), visual score, and inline price edit +
-// pause/resume. Price edits show the indicative suggestion for context.
+// Farmer "My listings": live / paused / sold-out tabs over a photo grid with
+// stock split (sold · reserved · available), the live grade (photo score
+// moved by customer reviews), and inline price edit + pause/resume + remove.
+// Price edits show the indicative suggestion for context.
 "use client";
 
-import { Loader2, Package, Pause, Pencil, Play } from "lucide-react";
+import { Leaf, Loader2, Package, Pause, Pencil, Play, Trash2 } from "lucide-react";
 import { LayoutGroup, motion } from "framer-motion";
 import Link from "next/link";
 import { useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { QtyStepper } from "@/components/common/qty-stepper";
-import { MediaImage } from "@/components/common/media-image";
 import { ResponsiveModal } from "@/components/common/responsive-modal";
-import { EmptyState, ErrorState, SkeletonRows } from "@/components/common/states";
-import { FarmerStatusBadge } from "@/components/farmer/farmer-status-badge";
+import { EmptyState, ErrorState, SkeletonCards } from "@/components/common/states";
+import { CARD, CARD_GRID, CropPhoto, PhotoDeleteButton } from "@/components/farmer/crop-photo";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { PageHeader } from "@/components/shell/page-header";
+import { QualityRing } from "@/components/shop/listing-card";
 import { Button } from "@/components/ui/button";
 import { useLive } from "@/hooks/use-live";
 import { cropName } from "@/lib/crops";
@@ -38,8 +39,12 @@ interface Row {
   imageUrl: string | null;
   harvestDate: string;
   orders: number;
+  /** Live score: photos blended with customer reviews. */
   quality: number | null;
+  photoScore: number | null;
   grade: string | null;
+  reviews: number;
+  complaints: number;
 }
 
 /** /farmer/listings */
@@ -47,8 +52,11 @@ export function FarmerListings() {
   const { t, lang } = useI18n();
   const [tab, setTab] = useState<Row["status"]>("ACTIVE");
   const { data, error, isLoading, mutate } = useSWR<Row[]>("/api/farmer/listings");
-  useLive(["inventory.updated", "order.updated", "batch.updated"], () => mutate());
+  useLive(["inventory.updated", "order.updated", "batch.updated", "notification.created"], () => mutate());
   const [editing, setEditing] = useState<Row | null>(null);
+  // `removing` outlives the sheet so its text doesn't vanish while it closes.
+  const [removing, setRemoving] = useState<Row | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const rows = data?.filter((r) => r.status === tab) ?? [];
@@ -78,6 +86,25 @@ export function FarmerListings() {
     }
   }
 
+  function askRemove(r: Row) {
+    setRemoving(r);
+    setConfirming(true);
+  }
+
+  async function remove(r: Row) {
+    setConfirming(false);
+    setBusy(`remove:${r.id}`);
+    try {
+      await sendJSON(`/api/listings/${r.id}`, undefined, "DELETE");
+      toast.success(t("listings.removedToast"));
+      mutate();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -98,40 +125,63 @@ export function FarmerListings() {
           ))}
         </div>
       </LayoutGroup>
-      {isLoading && <SkeletonRows count={4} />}
+      {isLoading && <SkeletonCards count={8} className="grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" />}
       {error && <ErrorState message={error.message} onRetry={() => mutate()} />}
       {data && rows.length === 0 && <EmptyState icon={Package} title={t("common.empty")} />}
-      <ul className="grid gap-3 md:grid-cols-2">
+      <ul className={CARD_GRID}>
         {rows.map((r, i) => {
           const pct = (n: number) => `${(n / Math.max(1, r.total)) * 100}%`;
           return (
-            <motion.li key={r.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 8) * 0.04 }} className="flex gap-3 rounded-3xl border bg-card p-3 sm:p-4">
-              <div className="relative size-20 shrink-0 overflow-hidden rounded-2xl bg-muted">{r.imageUrl && <MediaImage src={r.imageUrl} sizes="80px" />}</div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold">{cropName(r.crop, lang)}</p>
-                  <FarmerStatusBadge status={r.status} />
-                  {r.quality !== null && <span className="text-xs text-muted-foreground">{t("listings.visual", { score: r.quality })}</span>}
+            <motion.li
+              key={r.id}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i, 12) * 0.035, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className={CARD}
+            >
+              <CropPhoto crop={r.crop} src={r.imageUrl}>
+                <QualityRing score={r.quality} className="absolute top-2 left-2" />
+                <span className="glass absolute bottom-2 left-2 inline-flex h-7 max-w-[calc(100%-1rem)] items-center gap-1 rounded-full px-2.5 text-[11px] font-medium">
+                  <Leaf className="size-3 shrink-0" /> <span className="truncate">{harvestAge(r.harvestDate, lang)}</span>
+                </span>
+                <PhotoDeleteButton label={t("listings.remove")} busy={busy === `remove:${r.id}`} onClick={() => askRemove(r)} />
+              </CropPhoto>
+              <div className="flex flex-1 flex-col p-3 sm:p-4">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <p className="leading-tight font-semibold break-words">{cropName(r.crop, lang)}</p>
+                  {r.grade && (
+                    <span className={cn("rounded-md px-1.5 text-[11px] font-semibold", r.grade === "A" ? "bg-lime/40" : r.grade === "C" ? "bg-tomato/15 text-tomato" : "bg-muted")}>
+                      {t("common.grade", { grade: r.grade })}
+                    </span>
+                  )}
                 </div>
-                <p className="mt-0.5 text-sm">
-                  <b className="tabular">{formatINR(r.price)}</b>/{unitName(r.unit, lang)}
-                  {r.suggestedPrice ? <span className="text-xs text-muted-foreground"> · {t("listings.suggestedShort", { price: formatINR(r.suggestedPrice) })}</span> : null}
+                <p className="tabular mt-1.5 text-lg leading-none font-semibold">
+                  {formatINR(r.price)}
+                  <span className="text-xs font-normal text-muted-foreground">/{unitName(r.unit, lang)}</span>
                 </p>
-                <div className="mt-2 flex h-2 gap-0.5 overflow-hidden rounded-full">
+                {r.suggestedPrice ? <p className="mt-1 text-[11px] text-muted-foreground">{t("listings.suggestedShort", { price: formatINR(r.suggestedPrice) })}</p> : null}
+                {r.reviews > 0 && (
+                  <p className={cn("mt-1 text-[11px] leading-snug", r.complaints >= 2 ? "font-medium text-tomato" : "text-muted-foreground")}>
+                    {t("listings.reviewsLine", { reviews: r.reviews, complaints: r.complaints })}
+                    {r.photoScore !== null && <span className="font-normal text-muted-foreground"> · {t("listings.photoStart", { score: r.photoScore })}</span>}
+                  </p>
+                )}
+                <div className="mt-2.5 flex h-2 gap-0.5 overflow-hidden rounded-full">
                   <span className="bg-foreground" style={{ width: pct(r.sold) }} />
                   <span className="bg-foreground/40" style={{ width: pct(r.reserved) }} />
                   <span className="flex-1 bg-muted" />
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {formatQty(r.available, r.unit, lang)} {t("listings.available")} · {formatQty(r.reserved, r.unit, lang)} {t("listings.reserved")} ·{" "}
-                  {formatQty(r.sold, r.unit, lang)} {t("listings.sold")} · {harvestAge(r.harvestDate, lang)}
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  <b className="font-semibold text-foreground">{formatQty(r.available, r.unit, lang)}</b> {t("listings.available")} · {formatQty(r.reserved, r.unit, lang)}{" "}
+                  {t("listings.reserved")} · {formatQty(r.sold, r.unit, lang)} {t("listings.sold")}
                 </p>
                 {r.status !== "SOLD_OUT" && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setEditing(r)}>
+                  // flex-1: side by side when they fit, full-width rows on narrow phone cards.
+                  <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => setEditing(r)}>
                       <Pencil /> {t("listings.editPrice")}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => patch(r, { status: r.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })} disabled={busy === r.id}>
+                    <Button size="sm" variant="secondary" className="flex-1" onClick={() => patch(r, { status: r.status === "ACTIVE" ? "PAUSED" : "ACTIVE" })} disabled={busy === r.id}>
                       {busy === r.id ? <Loader2 className="animate-spin" /> : r.status === "ACTIVE" ? <Pause /> : <Play />}
                       {r.status === "ACTIVE" ? t("listings.pause") : t("listings.resume")}
                     </Button>
@@ -143,6 +193,17 @@ export function FarmerListings() {
         })}
       </ul>
       {editing && <PriceEditor row={editing} busy={busy === editing.id} onClose={() => setEditing(null)} onSave={(price) => patch(editing, { price })} />}
+      <ResponsiveModal open={confirming} onOpenChange={setConfirming} title={removing ? t("listings.removeTitle", { crop: cropName(removing.crop, lang) }) : ""}>
+        <p className="text-sm text-muted-foreground">{t("listings.removeBody")}</p>
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="ghost" className="min-h-11" onClick={() => setConfirming(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="destructive" className="min-h-11" onClick={() => removing && remove(removing)}>
+            <Trash2 /> {t("listings.removeConfirm")}
+          </Button>
+        </div>
+      </ResponsiveModal>
     </div>
   );
 }

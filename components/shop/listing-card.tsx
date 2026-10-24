@@ -13,14 +13,14 @@ import type { SerializedListing } from "@/lib/listings";
 import { cn } from "@/lib/utils";
 import { AddToCart } from "./add-to-cart";
 
-/** Small ring showing the visual score. */
+/** Small ring showing the live quality score (photo check moved by customer reviews). */
 export function QualityRing({ score, className }: { score: number | null; className?: string }) {
   if (score === null) return null;
   const r = 9;
   const c = 2 * Math.PI * r;
   const color = score >= 85 ? "var(--lime)" : score >= 70 ? "var(--warning)" : "var(--tomato)";
   return (
-    <span className={cn("glass inline-flex h-7 items-center gap-1.5 rounded-full pr-2.5 pl-1 text-xs font-semibold", className)} title="Visual assessment score (not a certification)">
+    <span className={cn("glass inline-flex h-7 items-center gap-1.5 rounded-full pr-2.5 pl-1 text-xs font-semibold", className)} title="Quality score from the photo check and customer reviews (not a certification)">
       <svg viewBox="0 0 24 24" className="size-5 -rotate-90">
         <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="3" />
         <circle cx="12" cy="12" r={r} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - score / 100)} />

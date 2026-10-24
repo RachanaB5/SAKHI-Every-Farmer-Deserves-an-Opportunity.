@@ -1,7 +1,10 @@
 // Spoken-number normaliser for Sakhi (English, Hindi, Kannada —
 // native script and romanised). Turns "पचास", "ಐವತ್ತು", "fifty",
 // "dedh sau", "do sau pachaas", "saadhe teen" and ೫೦ / ५० into digits so
-// the intent parser only ever sees plain numbers.
+// the intent parser only ever sees plain numbers. Farmers often say
+// numbers in English in the middle of Hindi or Kannada; the Hindi and
+// Kannada recognisers then write them in their own script ("फिफ्टी",
+// "ट्वेंटी फाइव", "ಫಿಫ್ಟಿ"), so those spellings are numbers too.
 import { asciiDigits } from "@/lib/ai/fallback/numbers";
 
 type Kind = "num" | "mult" | "pre";
@@ -25,9 +28,25 @@ mult(100, "hundred");
 mult(1000, "thousand");
 mult(100000, "lakh", "lac");
 
+// ── English said in Hindi or Kannada mode (as those recognisers write it) ──
+const EN_IN_SCRIPT: [number, string[]][] = [
+  [0, ["ज़ीरो", "जीरो", "ಜೀರೋ", "ಝೀರೋ"]], [1, ["वन", "ವನ್", "ಒನ್"]], [2, ["टू", "ಟು", "ಟೂ"]], [3, ["थ्री", "ತ್ರೀ", "ಥ್ರೀ"]],
+  [4, ["फोर", "फ़ोर", "ಫೋರ್"]], [5, ["फाइव", "फ़ाइव", "फाईव", "ಫೈವ್"]], [6, ["सिक्स", "ಸಿಕ್ಸ್"]], [7, ["सेवन", "सेवेन", "ಸೆವೆನ್", "ಸೆವನ್"]],
+  [8, ["एट", "ऐट", "एइट", "ಎಯ್ಟ್", "ಎಟ್", "ಏಟ್"]], [9, ["नाइन", "नाईन", "ನೈನ್"]], [10, ["टेन", "ಟೆನ್"]], [11, ["इलेवन", "ಇಲೆವೆನ್", "ಇಲೆವನ್"]],
+  [12, ["ट्वेल्व", "ಟ್ವೆಲ್ವ್"]], [13, ["थर्टीन", "ಥರ್ಟೀನ್"]], [14, ["फोर्टीन", "फ़ोर्टीन", "ಫೋರ್ಟೀನ್"]], [15, ["फिफ्टीन", "फ़िफ़्टीन", "ಫಿಫ್ಟೀನ್"]],
+  [16, ["सिक्सटीन", "ಸಿಕ್ಸ್ಟೀನ್"]], [17, ["सेवनटीन", "सेवेंटीन", "ಸೆವೆಂಟೀನ್"]], [18, ["एटीन", "ऐटीन", "ಎಯ್ಟೀನ್"]], [19, ["नाइनटीन", "ನೈಂಟೀನ್"]],
+  [20, ["ट्वेंटी", "ट्वेन्टी", "ಟ್ವೆಂಟಿ"]], [30, ["थर्टी", "ಥರ್ಟಿ"]], [40, ["फोर्टी", "फ़ोर्टी", "ಫೋರ್ಟಿ"]], [50, ["फिफ्टी", "फ़िफ़्टी", "फिफ़्टी", "ಫಿಫ್ಟಿ"]],
+  [60, ["सिक्सटी", "ಸಿಕ್ಸ್ಟಿ"]], [70, ["सेवंटी", "सेवेंटी", "सेवेन्टी", "ಸೆವೆಂಟಿ"]], [80, ["एटी", "ऐटी", "ಎಯ್ಟಿ"]], [90, ["नाइंटी", "नाइनटी", "ನೈಂಟಿ"]],
+  [0.5, ["हाफ", "हाफ़", "ಹಾಫ್"]],
+];
+EN_IN_SCRIPT.forEach(([v, ws]) => num(v, ...ws));
+mult(100, "हंड्रेड", "हन्ड्रेड", "ಹಂಡ್ರೆಡ್");
+mult(1000, "थाउजेंड", "थाउज़ेंड", "थाउसेंड", "ಥೌಸಂಡ್", "ಥೌಸೆಂಡ್");
+
 // ── Hindi (Devanagari, 1–100) ──────────────────────────────────────────
-const HI_DEVA = "एक दो तीन चार पाँच छह सात आठ नौ दस ग्यारह बारह तेरह चौदह पंद्रह सोलह सत्रह अठारह उन्नीस बीस इक्कीस बाईस तेईस चौबीस पच्चीस छब्बीस सत्ताईस अट्ठाईस उनतीस तीस इकतीस बत्तीस तैंतीस चौंतीस पैंतीस छत्तीस सैंतीस अड़तीस उनतालीस चालीस इकतालीस बयालीस तैंतालीस चवालीस पैंतालीस छियालीस सैंतालीस अड़तालीस उनचास पचास इक्यावन बावन तिरपन चौवन पचपन छप्पन सत्तावन अट्ठावन उनसठ साठ इकसठ बासठ तिरसठ चौंसठ पैंसठ छियासठ सड़सठ अड़सठ उनहत्तर सत्तर इकहत्तर बहत्तर तिहत्तर चौहत्तर पचहत्तर छिहत्तर सतहत्तर अठहत्तर उन्यासी अस्सी इक्यासी बयासी तिरासी चौरासी पचासी छियासी सत्तासी अट्ठासी नवासी नब्बे इक्यानवे बानवे तिरानवे चौरानवे पचानवे छियानवे सत्तानवे अट्ठानवे निन्यानवे".split(" ");
-HI_DEVA.forEach((w, i) => num(i + 1, w));
+/** Hindi number words 1–99 (index 0 = एक), also used to speak numbers (hindi-speech.ts). */
+export const HINDI_1_99 = "एक दो तीन चार पाँच छह सात आठ नौ दस ग्यारह बारह तेरह चौदह पंद्रह सोलह सत्रह अठारह उन्नीस बीस इक्कीस बाईस तेईस चौबीस पच्चीस छब्बीस सत्ताईस अट्ठाईस उनतीस तीस इकतीस बत्तीस तैंतीस चौंतीस पैंतीस छत्तीस सैंतीस अड़तीस उनतालीस चालीस इकतालीस बयालीस तैंतालीस चवालीस पैंतालीस छियालीस सैंतालीस अड़तालीस उनचास पचास इक्यावन बावन तिरपन चौवन पचपन छप्पन सत्तावन अट्ठावन उनसठ साठ इकसठ बासठ तिरसठ चौंसठ पैंसठ छियासठ सड़सठ अड़सठ उनहत्तर सत्तर इकहत्तर बहत्तर तिहत्तर चौहत्तर पचहत्तर छिहत्तर सतहत्तर अठहत्तर उन्यासी अस्सी इक्यासी बयासी तिरासी चौरासी पचासी छियासी सत्तासी अट्ठासी नवासी नब्बे इक्यानवे बानवे तिरानवे चौरानवे पचानवे छियानवे सत्तानवे अट्ठानवे निन्यानवे".split(" ");
+HINDI_1_99.forEach((w, i) => num(i + 1, w));
 num(5, "पांच");
 num(6, "छः", "छे");
 num(0.5, "आधा", "आधे");
@@ -116,8 +135,8 @@ mult(1000, "saavira", "savira");
 num(0.5, "ardha");
 
 /** Words that are also common non-number words; converted only next to a unit, number or multiplier. */
-const AMBIGUOUS = new Set(["one", "do", "दो", "ek", "एक", "teen", "tin", "saath", "sat", "das", "aru", "elu", "bis", "bara", "sola", "che"]);
-const UNIT_HINT = /^(kg|kgs|kilo|kilos|kilogram|किलो|ಕಿಲೋ|ಕೆಜಿ|quintal|क्विंटल|ಕ್ವಿಂಟಲ್|dozen|दर्जन|ಡಜನ್|litre|liter|लीटर|ಲೀಟರ್|rupaye|rupees|rs|रुपये|रुपए|ರೂಪಾಯಿ|gram|ग्राम|tons?$|tonnes?$|टन|ಟನ್|km$)/;
+const AMBIGUOUS = new Set(["one", "do", "दो", "ek", "एक", "teen", "tin", "saath", "sat", "das", "aru", "elu", "bis", "bara", "sola", "che", "वन", "टू", "ಟು", "एट"]);
+const UNIT_HINT = /^(kg|kgs|kilo|kilos|kilogram|किलो|केजी|ಕಿಲೋ|ಕೆಜಿ|quintal|क्विंटल|ಕ್ವಿಂಟಲ್|dozen|दर्जन|डज़न|ಡಜನ್|litre|liter|लीटर|ಲೀಟರ್|rupaye|rupees|rs|रुपये|रुपए|रुपीस|रुपीज़|ರೂಪಾಯಿ|ರುಪೀಸ್|gram|ग्राम|tons?$|tonnes?$|टन|ಟನ್|km$)/;
 
 /** Value of one token, or null when it isn't a number word or numeral. */
 function tokenValue(tok: string): Word | null {
@@ -171,8 +190,8 @@ function parseNumberAt(words: string[], i: number): { value: number; end: number
   for (; j < words.length; j++) {
     const w = tokenValue(words[j].toLowerCase());
     if (!w) {
-      if (/^(and|aur|और|mattu|ಮತ್ತು)$/i.test(words[j]) && consumed && tokenValue((words[j + 1] ?? "").toLowerCase())) continue;
-      if (/^point$/i.test(words[j]) && consumed) {
+      if (/^(and|aur|और|एंड|mattu|ಮತ್ತು|ಅಂಡ್)$/i.test(words[j]) && consumed && tokenValue((words[j + 1] ?? "").toLowerCase())) continue;
+      if (/^(point|पॉइंट|पॉइन्ट|ಪಾಯಿಂಟ್)$/i.test(words[j]) && consumed) {
         const d = tokenValue((words[j + 1] ?? "").toLowerCase());
         if (d && d.kind === "num" && d.value < 10) {
           current += d.value / 10;

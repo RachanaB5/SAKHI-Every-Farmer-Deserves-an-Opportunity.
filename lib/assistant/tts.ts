@@ -2,12 +2,14 @@
 //
 // Kannada is spoken by FoodFlow's own Kannada voice when the server has it
 // installed (/api/tts, a native Kannada model), because browsers rarely
-// have one. Everything else uses the browser's speechSynthesis.
+// have one. Hindi uses FoodFlow's own Hindi voice when the device has no
+// natural-sounding Hindi voice (many desktops only have a robotic one).
+// Everything else uses the browser's speechSynthesis.
 //
-// Picking a device voice: Indian English first for English (names, places and crops
-// are pronounced the way farmers say them), then the most natural voice
-// (Edge "Natural", Google network, Apple enhanced), and a female voice for
-// Sakhi unless the farmer picks a male one. Kannada with neither the server
+// Picking a device voice: a neural voice (Edge "Natural", WaveNet) over a
+// robotic one, then Indian English (names, places and crops are pronounced
+// the way farmers say them) over smoother foreign accents, robotic desktop
+// voices last, and a female voice for Sakhi unless the farmer picks a male one. Kannada with neither the server
 // voice nor a Kannada voice on the device is read by a Hindi voice from
 // Devanagari letters rather than not at all, and the panel says so. Kannada or Hindi text is
 // never read by an English voice. Text is spoken sentence by sentence at a
@@ -32,6 +34,8 @@ const LANG_CODES: Record<AssistantLang, string[]> = {
 };
 /** A comfortable pace per language: Indic voices sound rushed at the default rate. */
 const BASE_RATE: Record<AssistantLang, number> = { en: 0.97, hi: 0.93, kn: 0.9 };
+/** Natural (neural) voices are tuned for their own pace; slowing them makes them drawl. */
+const NATURAL_RATE: Record<AssistantLang, number> = { en: 1, hi: 0.96, kn: 0.92 };
 const SPEED_FACTOR: Record<Speed, number> = { slow: 0.85, normal: 1, fast: 1.12 };
 
 // Voice names that reveal the speaker (the Web Speech API has no gender field).
@@ -63,26 +67,51 @@ const local = {
 export const ttsSupported = () => typeof window !== "undefined" && (("speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") || typeof Audio !== "undefined");
 const deviceTts = () => typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
 
-/** The pseudo voice id of FoodFlow's server-side Kannada voice. */
+/** The pseudo voice ids of FoodFlow's server-side voices. */
 export const SERVER_KANNADA = "foodflow:kn";
-let serverKn: Promise<boolean> | null = null;
-/** Whether the server can speak Kannada (asked once per page; also warms the model). */
-export function serverKannada(): Promise<boolean> {
-  if (typeof window === "undefined") return Promise.resolve(false);
-  serverKn ??= fetch("/api/tts?status=1&warm=1")
+export const SERVER_HINDI = "foodflow:hi";
+const SERVER_VOICE: Partial<Record<AssistantLang, { id: string; label: string }>> = {
+  kn: { id: SERVER_KANNADA, label: "ಸಖಿ · FoodFlow" },
+  hi: { id: SERVER_HINDI, label: "सखी · FoodFlow" },
+};
+type ServerVoices = { kn: boolean; hi: boolean };
+let serverStatus: Promise<ServerVoices> | null = null;
+/** Which voices the server can speak (asked once per page). */
+export function serverVoices(): Promise<ServerVoices> {
+  if (typeof window === "undefined") return Promise.resolve({ kn: false, hi: false });
+  serverStatus ??= fetch("/api/tts?status=1")
     .then((r) => (r.ok ? r.json() : null))
-    .then((j: { data?: { kn?: boolean } } | null) => Boolean(j?.data?.kn))
-    .catch(() => false);
-  return serverKn;
+    .then((j: { data?: Partial<ServerVoices> } | null) => ({ kn: Boolean(j?.data?.kn), hi: Boolean(j?.data?.hi) }))
+    .catch(() => ({ kn: false, hi: false }));
+  return serverStatus;
+}
+/** Whether the server can speak Kannada. */
+export const serverKannada = () => serverVoices().then((v) => v.kn);
+
+/**
+ * Whether `lang` is spoken by the server voice. Kannada: always, unless the
+ * farmer picked one of the device's own Kannada voices. Hindi: when the
+ * device has no natural Hindi voice (or the farmer picked the server voice);
+ * it is female, so a farmer who prefers a male voice keeps the device's.
+ */
+async function usesServerVoice(lang: AssistantLang): Promise<boolean> {
+  const server = SERVER_VOICE[lang];
+  if (!server || !(await serverVoices())[lang as "kn" | "hi"]) return false;
+  const chosen = local.get(voiceKey(lang));
+  const own = chosen === server.id || !deviceTts() ? [] : rankVoices(await loadVoices(), lang);
+  const uses =
+    chosen === server.id ||
+    (!(chosen && own.some((v) => v.voiceURI === chosen)) && (lang === "kn" || (getGender() !== "male" && !(own[0] && isNaturalVoice(own[0])))));
+  if (uses) warmServerVoice(lang);
+  return uses;
 }
 
-/** Kannada goes to the server voice unless the farmer picked one of the device's own Kannada voices. */
-async function usesServerVoice(lang: AssistantLang): Promise<boolean> {
-  if (lang !== "kn" || !(await serverKannada())) return false;
-  const chosen = local.get(voiceKey("kn"));
-  if (!chosen || chosen === SERVER_KANNADA) return true;
-  const own = deviceTts() ? rankVoices(await loadVoices(), "kn") : [];
-  return !own.some((v) => v.voiceURI === chosen);
+const warmed = new Set<AssistantLang>();
+/** Asks the server to load `lang`'s voice (and record Sakhi's fixed lines) once, only when it will be used. */
+function warmServerVoice(lang: AssistantLang) {
+  if (warmed.has(lang)) return;
+  warmed.add(lang);
+  fetch(`/api/tts?status=1&warm=${lang}`).catch(() => undefined);
 }
 
 /** Voices load asynchronously in Chrome; resolves once they're known (or after 1.5 s). */
@@ -106,12 +135,15 @@ function score(v: SpeechSynthesisVoice, lang: AssistantLang, gender: Gender | nu
   const rank = LANG_CODES[lang].findIndex((c) => code === c || code.startsWith(`${c}-`));
   if (rank < 0) return -1;
   let s = 100 - rank * 5;
-  if (code === "en-in") s += 60;
-  if (/natural|neural|wavenet/i.test(v.name)) s += 40;
-  if (/premium|enhanced/i.test(v.name)) s += 30;
+  // A neural voice beats a robotic one; otherwise Indian English wins (names,
+  // places and crops sound right), even over smoother foreign network voices.
+  if (/natural|neural|wavenet/i.test(v.name)) s += 70;
+  if (/premium|enhanced/i.test(v.name)) s += 40;
   if (/google/i.test(v.name)) s += 25;
+  if (code === "en-in") s += 50;
   if (/online/i.test(v.name)) s += 10;
   if (/espeak|compact/i.test(v.name)) s -= 60;
+  if (/desktop/i.test(v.name)) s -= 20;
   if (!v.localService) s += 5;
   if (gender && genderOf(v) === gender) s += 80;
   return s;
@@ -165,11 +197,12 @@ export async function voiceOptions(lang: AssistantLang): Promise<{ options: Voic
   const voices = await loadVoices();
   const { list, borrowed } = candidates(voices, lang);
   const options = list.map((v) => ({ uri: v.voiceURI, label: shortName(v.name), natural: isNaturalVoice(v), gender: genderOf(v) }));
-  if (lang === "kn" && (await serverKannada())) {
-    // FoodFlow's Kannada voice first; Hindi voices reading Kannada are no longer needed.
+  const serverVoice = SERVER_VOICE[lang];
+  if (serverVoice && (await serverVoices())[lang as "kn" | "hi"]) {
+    // FoodFlow's own voice first (for Kannada, Hindi voices reading Kannada are no longer needed).
     const own = borrowed ? [] : options;
-    const server: VoiceOption = { uri: SERVER_KANNADA, label: "ಸಖಿ · FoodFlow", natural: true, gender: "female" };
-    return { options: [server, ...own], current: (await usesServerVoice("kn")) ? SERVER_KANNADA : (voicePlan(voices, lang)?.voice.voiceURI ?? null), borrowed: false };
+    const server: VoiceOption = { uri: serverVoice.id, label: serverVoice.label, natural: true, gender: "female" };
+    return { options: [server, ...own], current: (await usesServerVoice(lang)) ? serverVoice.id : (voicePlan(voices, lang)?.voice.voiceURI ?? null), borrowed: false };
   }
   return { options, current: voicePlan(voices, lang)?.voice.voiceURI ?? null, borrowed };
 }
@@ -238,10 +271,11 @@ export async function speak(text: string, lang: AssistantLang, opts: { onStart?:
   if (await usesServerVoice(lang)) {
     stopSpeaking();
     const mine = generation;
-    const r = await speakServer(splitSentences(toSpoken(text, lang)), mine, opts);
+    const r = await speakServer(splitSentences(toSpoken(text, lang)), lang, mine, opts);
     if (r !== "unavailable") return r;
     // The server voice failed (offline, removed): carry on with the device.
-    serverKn = Promise.resolve(false);
+    const known = await serverVoices();
+    serverStatus = Promise.resolve({ ...known, [lang]: false });
   }
   if (!deviceTts()) return "unsupported";
   const plan = voicePlan(await loadVoices(), lang);
@@ -250,7 +284,7 @@ export async function speak(text: string, lang: AssistantLang, opts: { onStart?:
   // Chrome can leave the queue paused after a cancel.
   speechSynthesis.resume();
   const mine = ++generation;
-  const rate = BASE_RATE[lang] * SPEED_FACTOR[getSpeed()];
+  const rate = (isNaturalVoice(plan.voice) && !plan.borrowed ? NATURAL_RATE : BASE_RATE)[lang] * SPEED_FACTOR[getSpeed()];
   let spoken = toSpoken(text, lang);
   if (plan.borrowed) spoken = kannadaToDevanagari(spoken);
   for (const [i, sentence] of splitSentences(spoken).entries()) {
@@ -268,20 +302,21 @@ export function stopSpeaking() {
   if (deviceTts()) speechSynthesis.cancel();
 }
 
-// ── Server voice (Kannada) ─────────────────────────────────────────────
+// ── Server voices (Kannada, Hindi) ─────────────────────────────────────
 /** Sentence audio already fetched this page, as object URLs. */
 const audioCache = new Map<string, Promise<string | null>>();
 let stopAudio: (() => void) | null = null;
 
-function sentenceAudio(sentence: string): Promise<string | null> {
-  let hit = audioCache.get(sentence);
+function sentenceAudio(sentence: string, lang: AssistantLang): Promise<string | null> {
+  const key = `${lang}:${sentence}`;
+  let hit = audioCache.get(key);
   if (!hit) {
-    hit = fetch(`/api/tts?lang=kn&text=${encodeURIComponent(sentence)}`)
+    hit = fetch(`/api/tts?lang=${lang}&text=${encodeURIComponent(sentence)}`)
       .then((r) => (r.ok ? r.blob() : null))
       .then((b) => (b ? URL.createObjectURL(b) : null))
       .catch(() => null);
-    hit.then((u) => u === null && audioCache.delete(sentence));
-    audioCache.set(sentence, hit);
+    hit.then((u) => u === null && audioCache.delete(key));
+    audioCache.set(key, hit);
     if (audioCache.size > 80) audioCache.delete(audioCache.keys().next().value!);
   }
   return hit;
@@ -315,14 +350,14 @@ function playAudio(url: string, onStart?: () => void, onBoundary?: () => void): 
 }
 
 /** Plays each sentence from the server, fetching the next while the current one plays. */
-async function speakServer(sentences: string[], mine: number, opts: { onStart?: () => void; onBoundary?: () => void }): Promise<SpeakResult | "unavailable"> {
+async function speakServer(sentences: string[], lang: AssistantLang, mine: number, opts: { onStart?: () => void; onBoundary?: () => void }): Promise<SpeakResult | "unavailable"> {
   if (!sentences.length) return "spoken";
-  let next = sentenceAudio(sentences[0]);
+  let next = sentenceAudio(sentences[0], lang);
   for (let i = 0; i < sentences.length; i++) {
     const url = await next;
     if (mine !== generation) return "interrupted";
     if (!url) return i === 0 ? "unavailable" : "spoken";
-    if (i + 1 < sentences.length) next = sentenceAudio(sentences[i + 1]);
+    if (i + 1 < sentences.length) next = sentenceAudio(sentences[i + 1], lang);
     const r = await playAudio(url, i === 0 ? opts.onStart : undefined, opts.onBoundary);
     if (r !== "spoken") return r;
   }

@@ -26,6 +26,8 @@ export class GeminiHttpError extends Error {
 
 /** Transient server-side problems worth one more try. */
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+/** "Too busy" answers: the fallback model (its own quota) is tried at once instead. */
+const BUSY_STATUS = new Set([429, 503]);
 const MAX_ATTEMPTS = 2;
 /** Photos make requests slower, so they get a longer per-attempt timeout. */
 const IMAGE_TIMEOUT_FACTOR = 2;
@@ -55,9 +57,12 @@ function isRetryable(e: unknown): boolean {
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
 
+  /**
+   * @param models - the main model first, then fallbacks tried when it is rate-limited or overloaded
+   */
   constructor(
     private apiKey: string,
-    private model: string,
+    private models: string[],
     private timeoutMs: number,
   ) {}
 
@@ -72,15 +77,20 @@ export class GeminiProvider implements AIProvider {
     const deadline = Date.now() + perAttempt * BUDGET_FACTOR;
     let prompt = req.prompt;
     let lastError: unknown;
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    let model = 0;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS + this.models.length - 1; attempt++) {
       const remaining = deadline - Date.now();
       if (remaining < 1000) break;
       try {
-        const text = await this.call(req, prompt, Math.min(perAttempt, remaining));
+        const text = await this.call(req, this.models[model], prompt, Math.min(perAttempt, remaining));
         return req.schema.parse(extractJSON(text));
       } catch (e) {
         lastError = e;
         if (!isRetryable(e)) break;
+        if (e instanceof GeminiHttpError && BUSY_STATUS.has(e.status) && model + 1 < this.models.length) {
+          model++; // a busy model won't recover within this request; its fallback has its own quota
+          continue;
+        }
         if (isBadOutput(e)) {
           const why = e instanceof ZodError ? e.issues.map((i) => `${i.path.join(".") || "root"}: ${i.message}`).join("; ") : (e as Error).message;
           prompt = `${req.prompt}\n\nYour previous reply was rejected (${why.slice(0, 300)}). Reply again with ONLY the JSON object described above.`;
@@ -93,12 +103,12 @@ export class GeminiProvider implements AIProvider {
   }
 
   /** One generateContent round trip; returns the raw model text. */
-  private async call<T>(req: JSONRequest<T>, prompt: string, timeoutMs: number): Promise<string> {
+  private async call<T>(req: JSONRequest<T>, model: string, prompt: string, timeoutMs: number): Promise<string> {
     const parts: Record<string, unknown>[] = [{ text: prompt }];
     for (const img of req.images ?? []) {
       parts.push({ inline_data: { mime_type: img.mimeType, data: img.base64 } });
     }
-    const res = await fetch(`${ENDPOINT}/${encodeURIComponent(this.model)}:generateContent`, {
+    const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": this.apiKey },
       body: JSON.stringify({
@@ -121,7 +131,8 @@ export class GeminiProvider implements AIProvider {
 export function geminiFromEnv(): GeminiProvider {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new AIUnavailableError("GEMINI_API_KEY not set");
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+  const fallback = process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.1-flash-lite";
   const timeout = Number(process.env.AI_TIMEOUT_MS) || 8000;
-  return new GeminiProvider(key, model, timeout);
+  return new GeminiProvider(key, [...new Set([model, fallback].filter(Boolean))], timeout);
 }

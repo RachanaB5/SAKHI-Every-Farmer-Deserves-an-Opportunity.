@@ -20,7 +20,8 @@
     "db:firestore:import": "tsx scripts/migrate-to-firestore.ts",
     "postinstall": "prisma generate",
     "setup": "node scripts/setup.mjs",
-    "voice:kannada": "python scripts/kannada-voice/export.py"
+    "voice:kannada": "python scripts/kannada-voice/export.py",
+    "voice:hindi": "python scripts/kannada-voice/export.py --lang hi"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

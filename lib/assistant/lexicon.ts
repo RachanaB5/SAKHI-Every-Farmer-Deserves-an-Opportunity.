@@ -17,13 +17,27 @@ const EXTRA_CROP_TERMS: Record<CropSlug, string[]> = {
   milk: ["haalu", "halu", "ಹಾಲು", "doodh", "dudh", "दूध"],
   eggs: ["motte", "ಮೊಟ್ಟೆ", "ಮೊಟ್ಟೆಗಳು", "anda", "ande", "अंडा", "अंडे"],
   chicken: ["koli", "ಕೋಳಿ", "murga", "murgi", "मुर्गा", "मुर्गी", "चिकन"],
+  banana: ["ಬಾಳೆ ಹಣ್ಣು", "kele", "केले"],
+  mango: ["आम का", "आम के", "ಮಾವಿನ"],
+  apple: ["ಸೇಬು ಹಣ್ಣು"],
+  orange: ["ಕಿತ್ತಳೆ ಹಣ್ಣು", "santre"],
+  grapes: ["angoor", "ದ್ರಾಕ್ಷಿ ಹಣ್ಣು"],
+  pomegranate: ["anaar", "ದಾಳಿಂಬೆ ಹಣ್ಣು"],
+  guava: ["ಸೀಬೆ ಹಣ್ಣು", "ಪೇರಳೆ ಹಣ್ಣು", "amrood"],
+  papaya: ["ಪಪ್ಪಾಯ", "papita"],
 };
+
+/**
+ * Crop names that are also everyday words and would hijack other requests:
+ * "आम" (mango) also means "common" and sits inside "आमदनी" (earnings).
+ */
+const AMBIGUOUS_TERMS = new Set(["आम", "aam"]);
 
 /** term → slug, longest terms first so "patta gobhi" beats "gobhi". */
 export const CROP_TERMS: [string, CropSlug][] = CROP_SLUGS.flatMap((slug) =>
-  [...new Set([slug, CROPS[slug].names.en.toLowerCase(), CROPS[slug].names.hi, CROPS[slug].names.kn, ...CROPS[slug].aliases, ...EXTRA_CROP_TERMS[slug]].map((t) => t.toLowerCase().normalize("NFC")))].map(
-    (t) => [t, slug] as [string, CropSlug],
-  ),
+  [...new Set([slug, CROPS[slug].names.en.toLowerCase(), CROPS[slug].names.hi, CROPS[slug].names.kn, ...CROPS[slug].aliases, ...EXTRA_CROP_TERMS[slug]].map((t) => t.toLowerCase().normalize("NFC")))]
+    .filter((t) => !AMBIGUOUS_TERMS.has(t))
+    .map((t) => [t, slug] as [string, CropSlug]),
 ).sort((a, b) => b[0].length - a[0].length);
 
 export type CanonicalUnit = "kg" | "quintal" | "dozen" | "litre" | "gram";
@@ -46,7 +60,7 @@ export const PER_UNIT_TERMS = ["ಕಿಲೋಗೆ", "ಕೆಜಿಗೆ", "ಕ�
 /** Words that mark "per" before or after a unit. */
 export const PER_WORDS = ["per", "a", "each", "prati", "प्रति", "ka", "ke", "ki", "का", "के", "की", "ge", "ಗೆ", "ಒಂದಕ್ಕೆ"];
 
-export const CURRENCY_TERMS = ["₹", "rs", "rs.", "inr", "rupee", "rupees", "rupaye", "rupaiye", "rupaiya", "rupiya", "rupay", "rupai", "rupayi", "रुपये", "रुपए", "रुपया", "रूपये", "ರೂಪಾಯಿ", "ರೂ", "ರೂಪಾಯಿಗೆ", "ರೂಪಾಯಿಯಂತೆ", "bucks"];
+export const CURRENCY_TERMS = ["₹", "rs", "rs.", "inr", "rupee", "rupees", "rupaye", "rupaiye", "rupaiya", "rupiya", "rupay", "rupai", "rupayi", "रुपये", "रुपए", "रुपया", "रूपये", "ರೂಪಾಯಿ", "ರೂ", "ರೂಪಾಯಿಗೆ", "ರೂಪಾಯಿಯಂತೆ", "bucks", "रुपीस", "रुपीज़", "रुपीज", "ರುಪೀಸ್", "ರೂಪೀಸ್"];
 
 export const DATE_TERMS: [string, number][] = [
   ["today", 0], ["aaj", 0], ["aj", 0], ["आज", 0], ["ಇಂದು", 0], ["ಇವತ್ತು", 0], ["indu", 0], ["ivattu", 0],

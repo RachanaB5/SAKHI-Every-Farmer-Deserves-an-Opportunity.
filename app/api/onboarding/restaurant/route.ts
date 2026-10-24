@@ -20,12 +20,13 @@ export const POST = handler({ body: restaurantOnboardingSchema }, async ({ body,
   const at = coordsFor(body.area);
   const line = `${body.addressLine}, ${body.area} ${body.pincode}`;
   const { pin, ...answers } = body;
-  const creds = await accountCredentials(pin);
+  const creds = await accountCredentials(pin, body.phone);
   const user = await db.user.create({
     data: {
       name: body.contactName,
       phone: body.phone,
       pinHash: creds.pinHash,
+      phoneVerifiedAt: creds.phoneVerifiedAt,
       ...creds.google,
       role: "BULK_BUYER",
       language: body.language,

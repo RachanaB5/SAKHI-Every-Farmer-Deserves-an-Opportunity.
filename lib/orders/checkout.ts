@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import type { User } from "@prisma/client";
 import { z } from "zod";
 import { coordsFor } from "@/lib/areas";
+import { onOrderConfirmed } from "@/lib/assistant/autopilot";
 import { db } from "@/lib/db";
 import { HttpError } from "@/lib/api";
 import { orderTotals, round2 } from "@/lib/fees";
@@ -182,8 +183,11 @@ export async function placeQuote(
       totals: { subtotal: g.subtotal, deliveryFee: g.deliveryFee, platformFee: g.platformFee, total: g.total },
     });
     const res = await confirmOrder(order.id, buyer.id);
-    if (res.ok) placed.push({ id: order.id, code: order.code, farmerId: g.farmerId, farmerName: g.farmerName, total: g.total });
-    else failed.push({ orderId: order.id, farmerId: g.farmerId, farmerName: g.farmerName, total: g.total, reason: res.reason });
+    if (res.ok) {
+      placed.push({ id: order.id, code: order.code, farmerId: g.farmerId, farmerName: g.farmerName, total: g.total });
+      // Farmers who let Sakhi run their orders get a rider booked (or pickup readied) right away.
+      await onOrderConfirmed(order.id);
+    } else failed.push({ orderId: order.id, farmerId: g.farmerId, farmerName: g.farmerName, total: g.total, reason: res.reason });
   }
   return { groupId, placed, failed, total: round2(placed.reduce((s, p) => s + p.total, 0)) };
 }

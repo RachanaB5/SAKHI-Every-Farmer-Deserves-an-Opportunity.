@@ -13,19 +13,31 @@ import { normaliseSpokenNumbers } from "./numbers";
 // ── Digits ─────────────────────────────────────────────────────────────
 const DIGIT_WORDS: [number, string[]][] = [
   [0, ["zero", "oh", "shunya", "shoonya", "शून्य", "ज़ीरो", "जीरो", "sonne", "ಸೊನ್ನೆ", "ಶೂನ್ಯ", "ಜೀರೋ"]],
-  [1, ["one", "ek", "एक", "ondu", "ಒಂದು"]],
-  [2, ["two", "do", "दो", "eradu", "ಎರಡು"]],
-  [3, ["three", "teen", "tin", "तीन", "mooru", "ಮೂರು"]],
-  [4, ["four", "char", "chaar", "चार", "naalku", "nalku", "ನಾಲ್ಕು"]],
-  [5, ["five", "paanch", "panch", "पाँच", "पांच", "aidu", "ಐದು"]],
-  [6, ["six", "chhe", "che", "chah", "छह", "छः", "छे", "aaru", "ಆರು"]],
-  [7, ["seven", "saat", "सात", "elu", "ಏಳು"]],
-  [8, ["eight", "aath", "आठ", "entu", "ಎಂಟು"]],
-  [9, ["nine", "nau", "नौ", "ombattu", "ಒಂಬತ್ತು"]],
+  [1, ["one", "ek", "एक", "ondu", "ಒಂದು", "वन", "ವನ್", "ಒನ್"]],
+  [2, ["two", "do", "दो", "eradu", "ಎರಡು", "टू", "ಟು", "ಟೂ"]],
+  [3, ["three", "teen", "tin", "तीन", "mooru", "ಮೂರು", "थ्री", "ತ್ರೀ", "ಥ್ರೀ"]],
+  [4, ["four", "char", "chaar", "चार", "naalku", "nalku", "ನಾಲ್ಕು", "फोर", "फ़ोर", "ಫೋರ್"]],
+  [5, ["five", "paanch", "panch", "पाँच", "पांच", "aidu", "ಐದು", "फाइव", "फ़ाइव", "ಫೈವ್"]],
+  [6, ["six", "chhe", "che", "chah", "छह", "छः", "छे", "aaru", "ಆರು", "सिक्स", "ಸಿಕ್ಸ್"]],
+  [7, ["seven", "saat", "सात", "elu", "ಏಳು", "सेवन", "ಸೆವೆನ್", "ಸೆವನ್"]],
+  [8, ["eight", "aath", "आठ", "entu", "ಎಂಟು", "एट", "ऐट", "ಎಯ್ಟ್", "ಎಟ್"]],
+  [9, ["nine", "nau", "नौ", "ombattu", "ಒಂಬತ್ತು", "नाइन", "ನೈನ್"]],
 ];
 const DIGIT = new Map(DIGIT_WORDS.flatMap(([d, words]) => words.map((w) => [w, String(d)] as const)));
 const REPEAT = new Map([["double", 2], ["triple", 3], ["डबल", 2], ["ट्रिपल", 3], ["ಡಬಲ್", 2], ["ಟ್ರಿಪಲ್", 3]]);
-const EN_TENS = new Map(["twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"].map((w, i) => [w, (i + 2) * 10]));
+// English tens, also as the Hindi and Kannada recognisers write them ("नाइंटी एट" = 98).
+const EN_TENS = new Map(
+  [
+    ["twenty", "ट्वेंटी", "ಟ್ವೆಂಟಿ"],
+    ["thirty", "थर्टी", "ಥರ್ಟಿ"],
+    ["forty", "फोर्टी", "फ़ोर्टी", "ಫೋರ್ಟಿ"],
+    ["fifty", "फिफ्टी", "ಫಿಫ್ಟಿ"],
+    ["sixty", "सिक्सटी", "ಸಿಕ್ಸ್ಟಿ"],
+    ["seventy", "सेवंटी", "सेवेंटी", "ಸೆವೆಂಟಿ"],
+    ["eighty", "एटी", "ಎಯ್ಟಿ"],
+    ["ninety", "नाइंटी", "नाइनटी", "ನೈಂಟಿ"],
+  ].flatMap((words, i) => words.map((w) => [w, (i + 2) * 10] as const)),
+);
 
 /**
  * Every digit said in `text`, in order: numerals, digit words in three

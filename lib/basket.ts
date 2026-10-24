@@ -73,7 +73,7 @@ export function buildBasket(items: WantedItem[], listings: SerializedListing[]):
         [W.price * price, l.price === pMin ? "Lowest price" : "Good price"],
         [W.eta * eta, `Arrives in ~${l.etaHours ?? 6} h`],
         [W.fresh * fresh, daysOld(l.harvestDate) < 1 ? "Picked today" : "Freshest harvest"],
-        [W.quality * quality, `Visual score ${l.quality.score ?? "-"}`],
+        [W.quality * quality, `Quality score ${l.quality.score ?? "-"}`],
         [coverage > 1 ? CONSOLIDATION_BONUS * (coverage - 1) + 0.1 : 0, `Same farm as ${coverage - 1} other item${coverage > 2 ? "s" : ""}, one delivery`],
       ];
       reasons.sort((a, b) => b[0] - a[0]);

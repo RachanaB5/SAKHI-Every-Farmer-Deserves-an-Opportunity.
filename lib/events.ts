@@ -1,5 +1,5 @@
 // In-process event bus behind the /api/events SSE stream. Route handlers
-// publish changes (orders, inventory, batches, deliveries); connected
+// publish changes (orders, inventory, batches, deliveries, notifications); connected
 // clients receive the ones addressed to them. Single-instance by design —
 // clients also poll every few seconds, so multi-instance deploys still update.
 import { EventEmitter } from "node:events";
@@ -11,7 +11,8 @@ export type LiveEventType =
   | "delivery.updated"
   | "demand.updated"
   | "offer.updated"
-  | "settlement.updated";
+  | "settlement.updated"
+  | "notification.created";
 
 export interface LiveEvent {
   type: LiveEventType;

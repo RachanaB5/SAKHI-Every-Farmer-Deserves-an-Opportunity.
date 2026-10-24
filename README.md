@@ -23,7 +23,7 @@ One marketplace, five apps — each built mobile-first at 360px and scaling up t
 
 | Interface | Who | Highlights |
 | --- | --- | --- |
-| **Farmer** | Smallholders | List a harvest by **voice in Hindi, Kannada or English**; visual quality check on photos/video; indicative price advice from mandi data; orders, bulk offers, surplus rescue, traceable payouts. Whole UI in EN / हिन्दी / ಕನ್ನಡ. |
+| **Farmer** | Smallholders | List a harvest by **voice in Hindi, Kannada or English**; photo check by **Gemini** (is it really tomatoes? how fresh?) that says *not detectable* instead of guessing and never marks a farmer down for a blurry or dark phone photo; grades that then **follow customer reviews**, with an alert when buyers complain; indicative price advice from mandi data; orders, bulk offers, surplus rescue, traceable payouts. Whole UI in EN / हिन्दी / ಕನ್ನಡ. |
 | **Household** | Consumers | **Snap or type a grocery list → smart basket** across nearby farms; checkout with per-farm delivery; live tracking; OTP doorstep handover; **subscriptions** (milk every morning, vegetables every Sunday). |
 | **Restaurant / community kitchen** | Bulk buyers | Post urgent or recurring demand (form, voice or a procurement list); nearby farmers offer from live stock; **offers ranked** on cost, quantity, ETA, quality, distance and reliability; counter-offers; invoices. |
 | **Admin** | Operations | Human **verification queue** for every harvest (AI flags, duplicate-photo detection, EXIF capture time); disputes and refunds; trust & safety; platform controls; live analytics. |
@@ -32,10 +32,13 @@ One marketplace, five apps — each built mobile-first at 360px and scaling up t
 ### AI assists. People decide.
 
 - **Visual checks, not certificates.** Quality scores describe what's visible in photos — never freshness or food safety.
+- **No guessing.** If the photos can't be graded (not produce, too unclear, a collage or stock picture, the wrong crop, or eggs/milk/chicken whose freshness doesn't show in a photo) the check says *not detectable* and why, instead of giving a score.
+- **Fair to cheap cameras.** Gemini is told to judge the produce, not the photography, and a blurry or dark photo never lowers a score; photo quality only changes how sure we are.
+- **Customers keep grades honest.** Photos set a listing's starting grade; buyer reviews move it after that, and bad reviews pull it down. One buyer can't change a grade alone, complaints with a photo Gemini can confirm count more, and the farmer is notified. A listing whose photos weren't graded gets its score from reviews alone.
 - **Prices are indicative.** Numbers come from mandi reference prices and comparable listings; the model only rewords the explanation. The farmer sets the price.
 - **People approve listings.** AI flags help the admin; a person decides what goes live.
 - **OTP or it didn't happen.** Only the customer's one-time code marks an order delivered and releases a payout.
-- **Works without a key.** Every AI feature has a deterministic fallback (multilingual parsers, an image heuristic, template text), labelled *Offline estimate* in the UI.
+- **Works without a key.** Every AI feature except the photo check has a deterministic fallback (multilingual parsers, template text), labelled *Offline estimate* in the UI; without a key, photo checks say *not detectable* and an admin looks at the photos.
 
 ### Sakhi: ask by voice, in your language
 
@@ -67,6 +70,14 @@ How it stays trustworthy:
   written in Kannada letters first, so they are pronounced, not skipped. Sakhi's fixed lines are recorded
   once and cached. Build it with `npm run voice:kannada` (see [Configuration](#configuration)); without
   it, a Kannada voice on the device is used, or a Hindi voice reads the Kannada and the panel says so.
+- **A natural Hindi voice everywhere.** Many desktops only have a robotic Hindi voice, so FoodFlow can speak
+  Hindi itself too (SYSPIN's Hindi female voice, same licence, `npm run voice:hindi`), with numbers as Hindi
+  words (*दो हज़ार पाँच सौ*, *ढाई किलो*) and English words in Devanagari. A natural device voice (Edge's
+  Swara, Google हिन्दी) is still preferred when there is one. English picks the most natural voice on the
+  device, Indian English among equals.
+- **Numbers in any language mix.** Farmers often say numbers in English in the middle of Hindi or Kannada
+  (*"फिफ्टी किलो टमाटर, ट्वेंटी फाइव रुपये"*). The Hindi and Kannada recognisers write those in their own
+  script, and Sakhi reads them as numbers, including mobile numbers said digit by digit.
 - **Understands more than the options.** Shortcuts and slips pick the right answer (*"rest"*, *"resturant"*,
   *"the 2nd one"*, *"ಸಣ್ಣ"*, *"gpay and cash"*), and many more ways of saying yes and no (*"ಆಯ್ತು"*,
   *"हाँ जी"*, *"not now"*). Questions get answers instead of "I don't know": *"what is this app?"*,
@@ -144,7 +155,7 @@ Test Mode moves no real money. Without keys, checkout keeps its clearly labelled
 
 ### Demo script
 
-1. **Farmer** (Ramesh) → *New harvest* → tap the mic and say *“50 kilo tamatar, aaj tode, 25 rupaye kilo”* (or type it) → check the parsed fields → add photos → see the visual score and price advice → *Send for verification*.
+1. **Farmer** (Ramesh) → *New harvest* → pick the crop, quantity and harvest day → add photos → see the visual score and price advice → *Send for verification*. To list by voice instead, tap the sprout button and tell Sakhi *“50 kilo tamatar, aaj tode, 25 rupaye kilo”* (see step 8).
 2. **Admin** → *Review* → approve Ramesh's batch; open Ravi's tomato batch, see the duplicate-photo flag, and reject it.
 3. **Household** (Ananya) → *AI basket* → type or snap a grocery list → *Build my smart basket* → swap farms if you like → checkout with delivery. With Razorpay test keys set, *Pay* opens Razorpay: pay with `success@razorpay`, and the order page shows the Razorpay payment id; cancel the order and the refund id appears.
 4. **Farmer** → *Orders* → mark packed → *Book delivery*. **Delivery** (Imran) → open the run → *Picked up* → ask the household for the OTP (shown on their order page) → enter it → delivered. The farmer's *Payments* shows the settlement as pending.
@@ -169,7 +180,7 @@ flowchart LR
   API --> DOMAIN["Domain logic (lib/)<br/>inventory · order state machine · OTP handover<br/>fees & settlement · offer ranking · smart basket<br/>surplus · subscriptions · trust signals"]
   API --> AI["AI layer (lib/ai)<br/>withFallback()"]
   AI -- "key set" --> GEMINI[Gemini API]
-  AI -- "no key / timeout" --> FB[Deterministic fallbacks<br/>parsers · image heuristic · templates]
+  AI -- "no key / timeout" --> FB[Deterministic fallbacks<br/>parsers · templates · photos "not detectable"]
   DOMAIN --> PRISMA[Prisma ORM]
   PRISMA --> DB[("SQLite (local)<br/>Postgres (deploy)")]
   DOMAIN -- publish --> BUS
@@ -210,6 +221,9 @@ stateDiagram-v2
 | **Payments** | Razorpay Checkout when keys are set: the server prices the cart and opens a Razorpay order; orders are created only after the payment's signature, order, amount and capture are confirmed with Razorpay. Verify and webhook race safely (one claims, the other reads). A farm that ran out after payment, a cancellation or a refunded dispute is refunded through Razorpay's API. | `lib/payments/` |
 | **Subscriptions** | IST slot scheduling; a run claims the plan with a conditional update so overlapping schedulers place one order; falls back to the same farmer, then any farm, when stock runs out. | `lib/subscriptions.ts` |
 | **Trust & safety** | SHA-256 duplicate-photo detection across batches, complaint-rate flags, price outliers vs. the mandi reference. Flags only — suspension and pausing are human actions, audit-logged. | `lib/trust.ts` |
+| **Photo check** | Gemini says what the photos show (the catalogue crops plus common produce we don't sell yet), whether that is the crop the farmer wrote, whether it is a mix or a stock photo / collage, and how fresh it visibly is (0–100). A score is given only when the photos clearly show the declared produce; otherwise the result is *not detectable* with the reason (and a one-tap crop fix on a mismatch). Blur, low light and over-exposure are measured locally and only set a confidence, never the score. When the main model is rate-limited a second model (own quota) answers. | `lib/ai/vision/`, `lib/ai/prompts.ts` |
+| **Phone verification** | Joining and "Forgot PIN?" text a 6-digit code (MSG91 or Twilio). Codes are stored only as an HMAC, expire in 10 minutes, allow 5 tries and one resend every 30 s; a correct code sets a signed 20-minute cookie that every sign-up route requires, so an account can only be created for a number its owner controls. The PIN is typed twice. | `lib/auth/phone-code.ts`, `lib/sms.ts` |
+| **Review-driven grades** | The photo score is a prior worth 2–8 reviews (more when the photos were clear). Each buyer's latest review of the item is blended in; a complaint whose photo the model confirms counts 1.5×, one it contradicts 0.5×. The grade only changes once two different buyers agree. Lateness and short weight don't count against produce quality. Complaints and grade changes notify the farmer. | `lib/quality/` |
 
 ### Payments (Razorpay)
 
@@ -250,6 +264,7 @@ Playwright (responsive QA script) · Firebase Authentication · Firestore.
 | `npm run db:firestore:import` | Dry-run a copy of Prisma records into Firestore; add `-- --write` to import |
 | `npm run db:reset` | Recreate the database and reseed the demo |
 | `npm run db:studio` | Browse the data in Prisma Studio |
+| `npm run voice:hindi` | The same for SYSPIN's Hindi voice (`models/hi-female`) |
 | `npm run voice:kannada` | Download SYSPIN's open Kannada voice and convert it for the server (one time: a 333 MB download, 115 MB kept on disk) |
 | `node scripts/screenshots.mjs --role FARMER /farmer` | Screenshot pages at 360 / 768 / 1280 px and flag overflow and console errors |
 
@@ -262,8 +277,9 @@ Copy `.env.example` to `.env` (`npm run setup` does this for you).
 | `DATABASE_URL` | yes | `file:./dev.db` locally; a Postgres URL in production |
 | `DIRECT_URL` | no | Direct (unpooled) Postgres URL for Neon / Supabase |
 | `SESSION_SECRET` | yes | 32+ random characters; signs sessions, pickup QRs and OTP hashes |
-| `GEMINI_API_KEY` | no | Enables the Gemini model; without it every AI feature uses its fallback |
+| `GEMINI_API_KEY` | for photo checks | Enables Gemini: photo checks, and smarter parsing / explanations. Without it photo checks say *not detectable* (an admin reviews the photos) and other AI features use their fallbacks. The free tier allows only a few requests a minute; enable billing for real use |
 | `GEMINI_MODEL`, `AI_TIMEOUT_MS` | no | Model name and per-call timeout before falling back |
+| `GEMINI_FALLBACK_MODEL` | no | Answers when the main model is rate-limited or overloaded (default `gemini-3.1-flash-lite`; empty turns it off) |
 | `STORAGE_DRIVER` | no | `local` (default) writes uploads to `public/uploads`; falls back to inline on read-only hosts |
 | `CRON_SECRET` | no | Lets a scheduler call `/api/subscriptions/run-due` |
 | `NEXT_PUBLIC_STT_PROVIDER` | no | `browser` (default) uses the browser's speech recognition for Sakhi. `server` is reserved for a self-hosted Indic model and is not implemented yet |
@@ -274,6 +290,8 @@ Copy `.env.example` to `.env` (`npm run setup` does this for you).
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | no | Turn on Razorpay checkout and refunds. Test keys (`rzp_test_…`) are free and move no real money |
 | `RAZORPAY_WEBHOOK_SECRET` | no | Verifies `/api/payments/razorpay/webhook`, which places orders if a buyer closes the tab after paying |
 | `KANNADA_VOICE_DIR` | no | Where Sakhi's Kannada voice model lives (default `models/kn-female`, built by `npm run voice:kannada`, which needs Python with `torch`, `onnx` and `onnxruntime`). Without it Kannada uses the device's voices |
+| `HINDI_VOICE_DIR` | no | Where Sakhi's Hindi voice model lives (default `models/hi-female`, built by `npm run voice:hindi`). Without it Hindi uses the device's voices |
+| `SMS_PROVIDER` | for launch | How sign-up and "Forgot PIN?" codes are texted: `msg91` (India, DLT template with an `{otp}` variable; `MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID`) or `twilio` (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`). `console` shows the code on screen instead, for development and labelled demos only. Unset: development behaves like `console`, production refuses to send |
 
 ### Firebase authentication and Firestore migration
 
@@ -314,7 +332,9 @@ Firestore-backed data flow has been migrated and verified.
 
 1. Create a Postgres database (Neon, Supabase or Vercel Postgres).
 2. Import the repository in Vercel and set `DATABASE_URL` (and `DIRECT_URL` if your provider pools
-   connections), `SESSION_SECRET`, optionally `GEMINI_API_KEY` and `CRON_SECRET`.
+   connections), `SESSION_SECRET`, optionally `GEMINI_API_KEY` and `CRON_SECRET`, and an
+   `SMS_PROVIDER` with its keys so new members get their sign-up code by text. (Without one, sign-up
+   can't send codes in production; `SMS_PROVIDER=console` shows the code on screen for a demo site.)
 3. Deploy. `vercel.json` runs `npm run vercel-build`, which switches the Prisma schema to Postgres,
    pushes the schema and builds.
 4. Seed the demo once from your machine:
@@ -336,6 +356,7 @@ uploaded media is stored inline when the filesystem is read-only.
 app/                 routes — one folder per role (farmer, shop, bulk, admin, delivery) + /api
 components/          UI by role, plus shell, motion, 3D (three/) and landing sections
 lib/                 domain logic, AI layer, auth, i18n (en / hi / kn), validators
+models/              Sakhi's Kannada / Hindi voices once built (not committed)
 prisma/              schema, migration and the deterministic demo seed
 scripts/             setup, Postgres switch, responsive screenshot QA
 tests/               Vitest suites (run against a throwaway SQLite database)

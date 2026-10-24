@@ -25,6 +25,15 @@ const CASES: [string, number][] = [
   ["सवा सौ", 125],
   ["पौने दो सौ", 175],
   ["एक हज़ार", 1000],
+  // English said in Hindi / Kannada mode, written in that script by the recogniser
+  ["फिफ्टी", 50],
+  ["ट्वेंटी फाइव", 25],
+  ["टू हंड्रेड फिफ्टी", 250],
+  ["वन थाउजेंड", 1000],
+  ["थ्री पॉइंट फाइव", 3.5],
+  ["ಫಿಫ್ಟಿ", 50],
+  ["ಟ್ವೆಂಟಿ ಫೈವ್", 25],
+  ["ಟು ಹಂಡ್ರೆಡ್", 200],
   // Hindi — romanised
   ["pachaas", 50],
   ["pachees", 25],

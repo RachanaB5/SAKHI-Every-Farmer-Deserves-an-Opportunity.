@@ -23,7 +23,7 @@ export const prepareSchema = z.object({
 export const confirmSchema = z.object({ token: z.string().min(20).max(4000) });
 
 export const assistantSettingsSchema = z
-  .object({ welcomeSeen: z.boolean().optional(), autoVoice: z.boolean().optional() })
+  .object({ welcomeSeen: z.boolean().optional(), autoVoice: z.boolean().optional(), autopilot: z.boolean().optional() })
   .refine((v) => Object.keys(v).length > 0, { message: "Nothing to change" });
 
 export type InterpretInput = z.infer<typeof interpretSchema>;

@@ -82,7 +82,7 @@ export interface GuideOptions {
   values: GuideValues;
   /** Joining with Google: no PIN on the last screen. */
   google: boolean;
-  /** The PIN box holds a valid PIN (typed by the farmer, never spoken). */
+  /** The mobile number is proven with the texted code and (unless joining with Google) a valid PIN is typed twice. Typed, never spoken. */
   pinReady: boolean;
   /** The wizard's current error, e.g. why the account couldn't be created. */
   error: string | null;
@@ -240,9 +240,9 @@ export function useSignupGuide(opts: GuideOptions) {
         pending.current = null;
         return advance(said);
       }
-      if (!latest.current.google && !latest.current.pinReady) {
+      if (!latest.current.pinReady) {
         pending.current = { kind: "pinType" };
-        return void sayLine(join(said, line(LINES.pin)), false);
+        return void sayLine(join(said, line(latest.current.google ? LINES.code : LINES.pin)), false);
       }
       pending.current = { kind: "create" };
       void sayLine(join(said, line(LINES.create, { name: v.contactName.split(" ")[0] })), true);
@@ -317,7 +317,7 @@ export function useSignupGuide(opts: GuideOptions) {
       const noted = (value: string) => line(LINES.picked[pickedTurn.current++ % LINES.picked.length], { value });
       const unclear = () => line(choiceQ ? LINES.unclearOptions : yesNoAsked ? LINES.yesOrNo : LINES.unclear, { options });
 
-      if (p.kind === "pinType") return void sayLine(line(LINES.pin), false);
+      if (p.kind === "pinType") return void sayLine(line(latest.current.google ? LINES.code : LINES.pin), false);
       if (p.kind === "pinCheck") {
         const yes = matchYesNo(text);
         pinSuggestion.current = null;

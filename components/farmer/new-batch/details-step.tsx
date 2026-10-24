@@ -19,21 +19,18 @@ const UNITS: Unit[] = ["kg", "litre", "dozen"];
 /**
  * @param fields - current draft values
  * @param set - partial updater
- * @param missing - field names to highlight (from validation or voice parsing)
- * @param voice - optional voice capture block rendered above the form
+ * @param missing - field names to highlight (from validation)
  * @param cropOrder - crops to show, farmer's own first
  */
 export function DetailsStep({
   fields,
   set,
   missing,
-  voice,
   cropOrder,
 }: {
   fields: DraftFields;
   set: (patch: Partial<DraftFields>) => void;
   missing: string[];
-  voice?: React.ReactNode;
   cropOrder?: CropSlug[];
 }) {
   const { t, lang } = useI18n();
@@ -47,8 +44,6 @@ export function DetailsStep({
 
   return (
     <div className="space-y-7">
-      {voice}
-
       <section className={cn("space-y-3 rounded-3xl", flag("crop") && "ring-2 ring-tomato/60 ring-offset-4 ring-offset-background")}>
         <Label className="text-[15px]">{t("batch.crop")}</Label>
         <CropPicker

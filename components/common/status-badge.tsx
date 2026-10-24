@@ -15,6 +15,7 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
   ACTIVE: { label: "Live", tone: "lime" },
   PAUSED: { label: "Paused", tone: "neutral" },
   SOLD_OUT: { label: "Sold out", tone: "neutral" },
+  REMOVED: { label: "Removed", tone: "neutral" },
   // Orders
   PLACED: { label: "Placed", tone: "info" },
   CONFIRMED: { label: "Confirmed", tone: "info" },

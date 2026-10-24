@@ -39,6 +39,7 @@ const CATEGORY_PHOTO: Record<string, { src: string; cls?: string }> = {
   "": { src: PHOTOS["veg-basket"].src },
   vegetables: { src: PHOTOS["crate-topdown"].src },
   leafy: { src: "/seed/spinach-1.jpg" },
+  fruits: { src: PHOTOS["fruit-basket"].src },
   dairy: { src: "/seed/milk-1.jpg" },
   eggs: { src: "/seed/eggs-1.jpg" },
   poultry: { src: "/seed/chicken-1.jpg" },
@@ -48,7 +49,7 @@ const SORTS: { key: Sort; label: string }[] = [
   { key: "nearest", label: "Nearest farm" },
   { key: "fresh", label: "Freshest harvest" },
   { key: "price", label: "Lowest price" },
-  { key: "quality", label: "Best visual score" },
+  { key: "quality", label: "Best quality score" },
 ];
 
 /**

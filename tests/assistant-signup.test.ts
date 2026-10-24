@@ -15,6 +15,10 @@ describe("spoken digits", () => {
     ["೯೮೭೬೫ ೪೩೨೧೦", "9876543210"],
     ["५६१ २०३", "561203"],
     ["my number is nine eight oh oh", "9800"],
+    // English digits said in Hindi / Kannada mode, written in that script by the recogniser
+    ["नाइन एट सेवन सिक्स फाइव फोर थ्री टू वन ज़ीरो", "9876543210"],
+    ["नाइंटी एट सेवेंटी सिक्स", "9876"],
+    ["ನೈನ್ ಎಯ್ಟ್ ಸೆವೆನ್ ಸಿಕ್ಸ್ ಫೈವ್ ಡಬಲ್ ಫೋರ್", "9876544"],
   ])("%s → %s", (said, digits) => {
     expect(spokenDigits(said)).toBe(digits);
   });

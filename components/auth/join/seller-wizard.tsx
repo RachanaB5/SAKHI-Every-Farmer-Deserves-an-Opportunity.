@@ -17,7 +17,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { GuideBanner, GuideBar, useSignupGuide, type GuideValues } from "@/components/assistant/signup-guide";
 import { Choices, Question, Toggle } from "@/components/auth/join/choices";
-import { AreaField, Field, LanguageField, PinField, SelectField, TextField } from "@/components/auth/join/fields";
+import { AreaField, Field, LanguageField, NewPinFields, SelectField, TextField, pinsReady } from "@/components/auth/join/fields";
+import { PhoneVerify } from "@/components/auth/phone-verify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AssistantLang } from "@/lib/assistant/intents";
@@ -68,7 +69,7 @@ function readDraft(): string | null {
 const toLang = (l: string): AssistantLang => (l === "en" || l === "hi" ? l : "kn");
 
 /** What must be filled in before moving on from each screen (null = OK). */
-function check(step: number, d: Draft, pin: string, google: boolean): string | null {
+function check(step: number, d: Draft, pin: { pin: string; confirm: string; verified: boolean }, google: boolean): string | null {
   const need = (cond: unknown, msg: string) => (cond ? null : msg);
   switch (step) {
     case 0:
@@ -97,7 +98,8 @@ function check(step: number, d: Draft, pin: string, google: boolean): string | n
         need(d.authorised, "Please confirm you may sell this produce") ??
         need(d.accurate, "Please agree to keep availability accurate") ??
         need(d.agreeTerms, "Please accept the seller terms and privacy policy") ??
-        need(google || /^\d{4,6}$/.test(pin), "Create a 4–6 digit PIN")
+        need(pin.verified, "Verify your mobile number with the code we sent") ??
+        need(google || pinsReady(pin.pin, pin.confirm), "Create a 4–6 digit PIN and type it again")
       );
   }
 }
@@ -110,6 +112,10 @@ export function SellerWizard({ google }: { google?: { name: string; email: strin
   const [step, setStep] = useState(0);
   const [d, setD] = useState<Draft>({ ...EMPTY, contactName: google?.name ?? "" });
   const [pin, setPin] = useState("");
+  const [pin2, setPin2] = useState("");
+  // The number proven with a texted code; editing the number un-verifies it.
+  const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
+  const verified = verifiedPhone !== null && verifiedPhone === normalisePhone(d.phone);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // The screens switch language once the seller picks one (the default stays English).
@@ -168,7 +174,7 @@ export function SellerWizard({ google }: { google?: { name: string; email: strin
    * @param values - the answers to check, when they are newer than the last render (the voice guide)
    */
   function next(values: Draft = d): boolean {
-    const problem = check(step, values, pin, Boolean(google));
+    const problem = check(step, values, { pin, confirm: pin2, verified }, Boolean(google));
     if (problem) {
       setError(problem);
       return false;
@@ -186,7 +192,7 @@ export function SellerWizard({ google }: { google?: { name: string; email: strin
     onLang: chooseLang,
     values: d,
     google: Boolean(google),
-    pinReady: Boolean(google) || /^\d{4,6}$/.test(pin),
+    pinReady: verified && (Boolean(google) || pinsReady(pin, pin2)),
     error,
     onFill: (patch) => {
       setD((s) => ({ ...s, ...patch }));
@@ -376,13 +382,31 @@ export function SellerWizard({ google }: { google?: { name: string; email: strin
                   onChange={set("agreeTerms")}
                 />
               </div>
-              {google ? (
-                <p className="rounded-2xl bg-muted px-4 py-3 text-sm">Joining with Google ({google.email}). You&apos;ll use Google to sign in next time, so there&apos;s no PIN to remember.</p>
-              ) : (
-                <div className="max-w-sm">
-                  <PinField value={pin} onChange={(v) => { setPin(v); setError(null); }} label={tx("Create a PIN to finish")} hint={tx("You'll use your mobile number and this PIN to sign in.")} />
-                </div>
-              )}
+              <div className="max-w-xl space-y-4">
+                <PhoneVerify
+                  phone={d.phone}
+                  onPhone={str("phone")}
+                  purpose="SIGNUP"
+                  verified={verified}
+                  onVerified={(ok) => {
+                    setVerifiedPhone(ok ? normalisePhone(d.phone) : null);
+                    setError(null);
+                  }}
+                  tx={tx}
+                />
+                {google ? (
+                  <p className="rounded-2xl bg-muted px-4 py-3 text-sm">Joining with Google ({google.email}). You&apos;ll use Google to sign in next time, so there&apos;s no PIN to remember.</p>
+                ) : (
+                  <NewPinFields
+                    pin={pin}
+                    onPin={(v) => { setPin(v); setError(null); }}
+                    confirm={pin2}
+                    onConfirm={(v) => { setPin2(v); setError(null); }}
+                    tx={tx}
+                    label="Create a PIN to finish"
+                  />
+                )}
+              </div>
               <p className="rounded-2xl bg-muted px-4 py-3 text-sm">{tx("Every harvest you list is checked by a person before buyers see it. You can change your selling preferences, delivery and payout settings any time after you join.")}</p>
             </>
           )}

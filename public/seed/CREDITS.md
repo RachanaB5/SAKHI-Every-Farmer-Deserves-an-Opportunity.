@@ -1,6 +1,6 @@
 # Seed image credits
 
-All seed photos are public-domain (CC0 or Public Domain Mark) images found via Openverse, resized to 960×720.
+All seed photos are public-domain (CC0, Public Domain Mark or public-domain dedications) images found via Openverse, and for the fruits Wikimedia Commons, resized to 960×720.
 
 | File | Title | Creator | License | Source |
 | --- | --- | --- | --- | --- |
@@ -36,3 +36,11 @@ All seed photos are public-domain (CC0 or Public Domain Mark) images found via O
 | eggs-2.jpg | Bowl brown eggs breakfast | unknown | CC0 | https://www.rawpixel.com/image/3289792/free-photo-image-baking-bowl-breakfast |
 | chicken-1.jpg | Free raw chicken be cooked | unknown | CC0 | https://www.rawpixel.com/image/5914179/photo-image-public-domain-food-branch |
 | chicken-2.jpg | Free raw chicken be cooked | unknown | CC0 | https://www.rawpixel.com/image/5925270/photo-image-public-domain-food-branch |
+| apple-1.jpg | Apples in basket 2018 G1 | George Chernilevsky | Public domain | https://commons.wikimedia.org/wiki/File:Apples_in_basket_2018_G1.jpg |
+| banana-1.jpg | Bunch of bananas on sale | Wilfredor | CC0 | https://commons.wikimedia.org/wiki/File:Bunch_of_bananas_on_sale.jpg |
+| grapes-1.jpg | BUNCH WINE GRAPES green close up (48986222083) | Alabama Extension | CC0 | https://commons.wikimedia.org/wiki/File:BUNCH_WINE_GRAPES_green_close_up_(48986222083).jpg |
+| guava-1.jpg | Guava - Psidium guajava fruit of Cuba | Sarang | Public domain | https://commons.wikimedia.org/wiki/File:Guava_-_Psidium_guajava_fruit_of_Cuba.jpg |
+| mango-1.jpg | Carabao Mangoes from Cebu, Philippines | Bim24 | CC0 | https://commons.wikimedia.org/wiki/File:Carabao_Mangoes_from_Cebu,_Philippines.jpg |
+| orange-1.jpg | Oranges a fruit | safaritravelplus | CC0 | https://commons.wikimedia.org/wiki/File:Oranges_a_fruit.jpg |
+| papaya-1.jpg | Papaya fruit | Miansari66 | Public domain | https://commons.wikimedia.org/wiki/File:Papaya_fruit.JPG |
+| pomegranate-1.jpg | Soft seed pomegranate | Fumikas Sagisavas | CC0 | https://commons.wikimedia.org/wiki/File:Soft_seed_pomegranate.jpg |

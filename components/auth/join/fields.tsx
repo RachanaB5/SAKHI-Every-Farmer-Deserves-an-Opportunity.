@@ -1,4 +1,4 @@
-// Small form pieces shared by the join forms.
+// Small form pieces shared by the join forms and PIN reset.
 "use client";
 
 import { Input } from "@/components/ui/input";
@@ -66,3 +66,45 @@ export function PinField({ value, onChange, label = "Create a PIN", hint = "You'
     <TextField label={label} id="pin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} placeholder="4–6 digits" value={value} onChange={(v) => onChange(v.replace(/\D/g, ""))} hint={hint} />
   );
 }
+
+/** A new PIN typed twice, so a slip of the finger can't lock someone out. */
+export function NewPinFields({
+  pin,
+  onPin,
+  confirm,
+  onConfirm,
+  tx = (s: string) => s,
+  label = "Create a PIN",
+  hint = "You'll use your mobile number and this PIN to sign in.",
+}: {
+  pin: string;
+  onPin: (v: string) => void;
+  confirm: string;
+  onConfirm: (v: string) => void;
+  tx?: (s: string) => string;
+  label?: string;
+  hint?: string;
+}) {
+  const mismatch = confirm.length >= 4 && confirm !== pin;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <PinField value={pin} onChange={onPin} label={tx(label)} hint={tx(hint)} />
+      <Field label={tx("Type the PIN again")} id="pin2" hint={mismatch ? tx("The two PINs don't match") : undefined}>
+        <Input
+          id="pin2"
+          type="password"
+          inputMode="numeric"
+          autoComplete="new-password"
+          maxLength={6}
+          placeholder="4–6 digits"
+          value={confirm}
+          aria-invalid={mismatch}
+          onChange={(e) => onConfirm(e.target.value.replace(/\D/g, ""))}
+        />
+      </Field>
+    </div>
+  );
+}
+
+/** A valid new PIN, typed the same twice. */
+export const pinsReady = (pin: string, confirm: string) => /^\d{4,6}$/.test(pin) && pin === confirm;
