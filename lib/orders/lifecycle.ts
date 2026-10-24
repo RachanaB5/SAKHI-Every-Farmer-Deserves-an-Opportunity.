@@ -1,7 +1,8 @@
 // Order lifecycle: create (PLACED, payment AUTHORISED) → confirm (stock
 // reserved + payment CAPTURED, atomically) → cancel (stock released,
-// payment refunded/voided). Payment states are simulated but kept
-// honest: a placed order is never shown as money received by a farmer.
+// payment refunded/voided). Payments are simulated unless the order was
+// paid through Razorpay, whose refunds go through its API. Either way a
+// placed order is never shown as money received by a farmer.
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { Prisma, type Fulfilment, type OrderType } from "@prisma/client";
@@ -11,6 +12,20 @@ import { publish } from "@/lib/events";
 import { InsufficientStockError, releaseItems, reserveItems, withTxRetry } from "@/lib/inventory";
 import { newOrderCode } from "@/lib/orders/code";
 import { HOLDS_STOCK, moveOrder } from "@/lib/orders/state";
+import { refundGatewayPayment } from "@/lib/payments/refunds";
+
+/** On a gateway payment whose order lost its stock after payment, until the refund is made. */
+export const REFUND_DUE_NOTE = "Stock ran out after payment, refunding through Razorpay";
+
+/** A payment already taken by a gateway, shared by every order of one checkout. */
+export interface GatewayPayment {
+  provider: "RAZORPAY";
+  orderId: string;
+  paymentId: string;
+  /** e.g. "UPI via Razorpay (test mode)" */
+  method: string;
+  paidAt: Date;
+}
 
 export interface NewOrder {
   buyerId: string;
@@ -27,6 +42,7 @@ export interface NewOrder {
   subscriptionId?: string | null;
   notes?: string | null;
   paymentMethod?: string;
+  gateway?: GatewayPayment;
   items: { listingId: string; title: string; unit: string; qty: number; unitPrice: number }[];
   totals: { subtotal: number; deliveryFee: number; platformFee: number; total: number };
 }
@@ -63,7 +79,20 @@ export async function createPlacedOrder(o: NewOrder) {
           ...o.totals,
           items: { create: o.items.map((i) => ({ ...i, farmerId: o.farmerId })) },
           events: { create: { status: "PLACED", actorId: o.buyerId } },
-          payment: { create: { status: "AUTHORISED", amount: o.totals.total, method: o.paymentMethod ?? "UPI (simulated)", ref: paymentRef() } },
+          payment: {
+            create: {
+              status: "AUTHORISED",
+              amount: o.totals.total,
+              method: o.paymentMethod ?? "UPI (simulated)",
+              ref: o.gateway?.paymentId ?? paymentRef(),
+              ...(o.gateway && {
+                provider: o.gateway.provider,
+                providerOrderId: o.gateway.orderId,
+                providerPaymentId: o.gateway.paymentId,
+                authorisedAt: o.gateway.paidAt,
+              }),
+            },
+          },
         },
         include: { items: true },
       });
@@ -80,7 +109,8 @@ export type ConfirmResult = { ok: true } | { ok: false; reason: string; listingI
 /**
  * Confirms a PLACED order: reserves every item's stock and captures the
  * payment in ONE transaction. If any item can't be reserved, nothing is
- * reserved, the order is CANCELLED and the payment authorisation released.
+ * reserved, the order is CANCELLED and the payment authorisation released
+ * (a gateway payment, already taken, is left for the caller to refund).
  * Idempotent — confirming an already-confirmed order is a no-op.
  */
 export async function confirmOrder(orderId: string, actorId?: string | null): Promise<ConfirmResult> {
@@ -101,7 +131,14 @@ export async function confirmOrder(orderId: string, actorId?: string | null): Pr
     await withTxRetry(async (tx) => {
       const moved = await moveOrder(tx, orderId, "CANCELLED", { from: ["PLACED"], note: e.message, data: { cancelReason: e.message } });
       if (moved) {
-        await tx.payment.update({ where: { orderId }, data: { status: "FAILED", failureReason: "Stock unavailable, authorisation released, no money taken" } });
+        const payment = await tx.payment.findUnique({ where: { orderId }, select: { provider: true } });
+        await tx.payment.update({
+          where: { orderId },
+          data:
+            payment?.provider === "RAZORPAY"
+              ? { status: "CAPTURED", capturedAt: new Date(), failureReason: REFUND_DUE_NOTE }
+              : { status: "FAILED", failureReason: "Stock unavailable, authorisation released, no money taken" },
+        });
       }
     });
     await notify(orderId);
@@ -111,10 +148,12 @@ export async function confirmOrder(orderId: string, actorId?: string | null): Pr
 
 /**
  * Cancels an order before handover: releases reserved stock and refunds a
- * captured payment (or voids an authorisation).
+ * captured payment (or voids an authorisation). A Razorpay payment is
+ * refunded through Razorpay once the cancellation is saved.
  * @param reason - shown to buyer and farmer
  */
 export async function cancelOrder(orderId: string, actorId: string | null, reason: string) {
+  let gateway = false;
   const done = await withTxRetry(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true, payment: true } });
     if (!order) throw new HttpError(404, "Order not found");
@@ -122,7 +161,8 @@ export async function cancelOrder(orderId: string, actorId: string | null, reaso
     const moved = await moveOrder(tx, orderId, "CANCELLED", { actorId, note: reason, data: { cancelReason: reason } });
     if (!moved) return false;
     if (heldStock) await releaseItems(tx, order.items);
-    if (order.payment) {
+    gateway = order.payment?.provider === "RAZORPAY";
+    if (order.payment && !gateway) {
       const captured = order.payment.status === "CAPTURED";
       await tx.payment.update({
         where: { orderId },
@@ -133,6 +173,7 @@ export async function cancelOrder(orderId: string, actorId: string | null, reaso
     return true;
   });
   if (!done) throw new HttpError(409, "This order can no longer be cancelled");
+  if (gateway) await refundGatewayPayment(orderId, reason);
   await notify(orderId);
 }
 

@@ -15,7 +15,8 @@ import { Switch } from "@/components/ui/switch";
 import type { AssistantLang } from "@/lib/assistant/intents";
 import { SPEECH_CODE } from "@/lib/assistant/language";
 import { cleanAnswer, findCrops, guideCommand, matchVillage, mobileFrom, sellCategory, spokenDigits } from "@/lib/assistant/signup";
-import { choiceLabel, fill as fillLine, LINES, matchMany, matchOne, matchYesNo, sameAsName, SCRIPT, type L3, type Question, type SellerAnswers } from "@/lib/assistant/signup-script";
+import { matchFaq, WHY_ANSWERS, whyAbout, whyKind } from "@/lib/assistant/faq";
+import { choiceLabel, choicesSaid, fill as fillLine, LINES, matchMany, matchOne, matchYesNo, sameAsName, SCRIPT, type L3, type Question, type SellerAnswers } from "@/lib/assistant/signup-script";
 import { createStt, type SttError, type SttLang, type SttProvider } from "@/lib/assistant/stt";
 import { speak, stopSpeaking, ttsSupported, voiceMode, type VoiceMode } from "@/lib/assistant/tts";
 import { cropName, type CropSlug } from "@/lib/crops";
@@ -48,9 +49,9 @@ const answered = (v: GuideValues, q: Question) => {
 };
 const spaced = (digits: string) => (digits.length === 10 ? `${digits.slice(0, 5).split("").join(" ")}, ${digits.slice(5).split("").join(" ")}` : digits.split("").join(" "));
 const toLang = (l: string): AssistantLang => (l === "en" || l === "hi" ? l : "kn");
-function listOf(items: string[], lang: AssistantLang) {
+function listOf(items: string[], lang: AssistantLang, type: "conjunction" | "disjunction" = "conjunction") {
   try {
-    return new Intl.ListFormat(LOCALE[lang], { type: "conjunction" }).format(items);
+    return new Intl.ListFormat(LOCALE[lang], { type }).format(items);
   } catch {
     return items.join(", ");
   }
@@ -288,10 +289,33 @@ export function useSignupGuide(opts: GuideOptions) {
           if (latest.current.step < LAST_STEP) return advance("");
           if (p?.kind !== "create") return ask();
       }
+      const choiceQ = p?.kind === "q" && (p.q.kind === "one" || p.q.kind === "many") ? p.q : null;
+      const options = choiceQ ? listOf(choicesSaid(choiceQ.field, lang), lang, "disjunction") : "";
+      const yesNoAsked = (p?.kind === "q" && p.q.kind === "yesno") || p?.kind === "create" || p?.kind === "pinCheck";
+
+      // A question (what is FoodFlow, why do you need my number, what are the
+      // options) is answered, then the pending question is asked again, so it
+      // is never taken as the answer.
+      const faq = matchFaq(text, { answering: Boolean(p) });
+      if (faq) {
+        let said: string;
+        if (faq.topic === "options" || faq.topic === "help") {
+          const how = choiceQ ? line(LINES.options, { options }) : yesNoAsked ? line(LINES.yesOrNo) : "";
+          said = faq.topic === "options" && how ? how : join(line(faq.answer), how);
+        } else if (faq.topic === "why") {
+          const kind = whyAbout(text) ?? (p?.kind === "q" ? whyKind(p.q.field) : null);
+          said = line(kind ? WHY_ANSWERS[kind] : WHY_ANSWERS.general);
+        } else {
+          said = line(faq.answer);
+        }
+        return p ? ask(said) : void sayLine(said, false);
+      }
+
       if (!p) return void sayLine(line(LINES.unclear), false);
       setAvatar("thinking");
       const got = (value: string) => line(LINES.got, { value });
       const noted = (value: string) => line(LINES.picked[pickedTurn.current++ % LINES.picked.length], { value });
+      const unclear = () => line(choiceQ ? LINES.unclearOptions : yesNoAsked ? LINES.yesOrNo : LINES.unclear, { options });
 
       if (p.kind === "pinType") return void sayLine(line(LINES.pin), false);
       if (p.kind === "pinCheck") {
@@ -358,19 +382,19 @@ export function useSignupGuide(opts: GuideOptions) {
         }
         case "one": {
           const value = matchOne(q.field, text);
-          if (!value) return void sayLine(line(LINES.unclear), true);
+          if (!value) return void sayLine(unclear(), true);
           fill({ [q.field]: value });
           return ask(noted(choiceLabel(q.field, value, lang)));
         }
         case "many": {
           const chosen = matchMany(q.field, text);
-          if (!chosen.length) return void sayLine(line(LINES.unclear), true);
+          if (!chosen.length) return void sayLine(unclear(), true);
           fill({ [q.field]: chosen });
           return ask(noted(listOf(chosen.map((x) => choiceLabel(q.field, x, lang)), lang)));
         }
         case "yesno": {
           const yes = matchYesNo(text);
-          if (!yes) return void sayLine(line(LINES.unclear), true);
+          if (!yes) return void sayLine(unclear(), true);
           if (yes === "yes") {
             fill({ [q.field]: true });
             return ask(line(LINES.ok));

@@ -37,6 +37,7 @@ export default function PrivacyPage() {
         <li>An AI provider (currently Google Gemini, when enabled) may receive produce photos and listing text so that it can check quality and suggest prices. When it is not enabled, simpler checks run on our own servers.</li>
         <li>Your browser&apos;s speech recognition may send voice to its vendor to turn it into text.</li>
         <li>OpenStreetMap Nominatim, as described under Location.</li>
+        <li>Razorpay, when online payment is switched on, receives your name, phone number, email (if you added one) and the amount when you pay. You type your card, UPI or bank details into Razorpay&apos;s own window, so FoodFlow never sees them; we keep only Razorpay&apos;s order, payment and refund references and the kind of method you used.</li>
       </ul>
 
       <h2>Bank and payment details</h2>

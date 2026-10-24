@@ -3,6 +3,7 @@
 // the choices in the farmer's language), and how a spoken answer becomes a
 // form value: keywords in three languages and scripts, "first / ಎರಡನೇ / तीसरा",
 // "all / ಎಲ್ಲಾ / सब", and amounts like "200 kilo a week" or "within 10 km".
+import { levenshtein } from "./fuzzy";
 import type { AssistantLang } from "./intents";
 import { yesNo } from "./lexicon";
 import { normaliseUtterance } from "./parse";
@@ -197,6 +198,9 @@ export const CHOICES: Record<DisplayField, Choice[]> = {
   ],
 };
 
+/** Every choice of a field as said in `lang`, for reading the options aloud. */
+export const choicesSaid = (field: DisplayField, lang: AssistantLang) => CHOICES[field].map((o) => o.say[lang]);
+
 /** A choice's label in `lang` (falls back to the value). */
 export function choiceLabel(field: DisplayField, value: string, lang: AssistantLang): string {
   return CHOICES[field].find((o) => o.value === value)?.say[lang] ?? value;
@@ -213,17 +217,72 @@ function hit(text: string, word: string): boolean {
   return text.includes(` ${w} `);
 }
 
-function scores(text: string, options: Choice[]): number[] {
+/** Words too common to tell options apart. */
+const STOP = new Set([
+  "and", "or", "the", "a", "an", "of", "to", "for", "with", "from", "only", "your", "you", "it", "is", "are", "my", "me", "we", "our", "they", "them", "their", "there", "this", "that", "these",
+  "will", "have", "has", "some", "just", "like", "want", "would", "about", "please", "yeah", "okay", "think", "what", "which", "when", "then", "than", "more", "also", "kilos", "kilometres", "week", "size", "sizes", "order", "orders", "ones", "kind", "type", "types",
+  "ಮತ್ತು", "ಅಥವಾ", "ಮಾತ್ರ", "ಒಳಗೆ", "ಕಿಲೋಮೀಟರ್", "ವಾರಕ್ಕೆ", "ಕಿಲೋ", "ಆರ್ಡರ್",
+  "और", "या", "की", "के", "का", "में", "से", "पर", "है", "हैं", "तक", "सिर्फ़", "किलो", "किलोमीटर", "हफ़्ते", "ऑर्डर",
+]);
+
+/**
+ * Words from each option's spoken labels (all three languages) that belong
+ * to that option alone, so "ಸಣ್ಣ" or "wholesalers" pick their option even
+ * when they aren't in the keyword list, while shared words pick nothing.
+ */
+const labelHintCache = new Map<DisplayField, string[][]>();
+function labelHints(field: DisplayField): string[][] {
+  let hints = labelHintCache.get(field);
+  if (!hints) {
+    const per = CHOICES[field].map(
+      (o) =>
+        new Set(
+          Object.values(o.say)
+            .flatMap((label) => label.toLowerCase().normalize("NFC").split(/[\s/,()]+/))
+            .filter((w) => w.length >= 3 && !STOP.has(w) && !/\d/.test(w)),
+        ),
+    );
+    hints = per.map((set, i) => [...set].filter((w) => per.every((other, j) => j === i || !other.has(w))));
+    labelHintCache.set(field, hints);
+  }
+  return hints;
+}
+
+/** A Latin word said differently or cut short ("rest", "resturant", "aparments"), as weak evidence. */
+function nearMiss(tokens: string[], words: string[]): boolean {
+  const latin = words.map((w) => w.replace(/^~/, "").replace(/\*$/, "")).filter((w) => /^[a-z]{4,}$/.test(w));
+  return tokens.some((tok) => latin.some((w) => w.startsWith(tok) || levenshtein(tok, w) <= (Math.min(tok.length, w.length) < 7 ? 1 : 2)));
+}
+
+/** How strongly the answer names each option (keywords, then words of the option's labels). */
+function strongScores(text: string, field: DisplayField): number[] {
   const t = norm(text);
-  return options.map((o) => (o.words ?? []).reduce((sum, w) => sum + (hit(t, w) ? (w.startsWith("~") ? 0.5 : 1) : 0), 0));
+  const hints = labelHints(field);
+  return CHOICES[field].map((o, i) => (o.words ?? []).reduce((sum, w) => sum + (hit(t, w) ? (w.startsWith("~") ? 0.5 : 1) : 0), 0) + hints[i].reduce((sum, w) => sum + (hit(t, w) ? 0.5 : 0), 0));
+}
+
+/** Options named only by a near miss ("apartmnts", "resturant"). */
+function nearScores(text: string, field: DisplayField): number[] {
+  const hints = labelHints(field);
+  const tokens = norm(text)
+    .trim()
+    .split(" ")
+    .filter((w) => /^[a-z]{4,}$/.test(w) && !STOP.has(w));
+  return CHOICES[field].map((o, i) => (nearMiss(tokens, [...(o.words ?? []), ...hints[i]]) ? 0.25 : 0));
+}
+
+/** Strong matches, or near misses when nothing is named outright. */
+function scores(text: string, field: DisplayField): number[] {
+  const strong = strongScores(text, field);
+  return strong.some((s) => s > 0) ? strong : nearScores(text, field);
 }
 
 /** Position words, checked before plain numbers so "the second one" means the second. */
 const ORDINALS: [number, string[]][] = [
-  [0, ["first", "ಮೊದಲ", "ಮೊದಲನೆ", "ಒಂದನೇ", "पहला", "पहले", "पहली"]],
-  [1, ["second", "ಎರಡನೇ", "दूसरा", "दूसरे", "दूसरी"]],
-  [2, ["third", "ಮೂರನೇ", "तीसरा", "तीसरे", "तीसरी"]],
-  [3, ["fourth", "ನಾಲ್ಕನೇ", "चौथा", "चौथे", "चौथी"]],
+  [0, ["first", "1st", "ಮೊದಲ", "ಮೊದಲನೆ", "ಒಂದನೇ", "पहला", "पहले", "पहली", "pehla", "pahla", "modalu", "modalane"]],
+  [1, ["second", "2nd", "ಎರಡನೇ", "दूसरा", "दूसरे", "दूसरी", "doosra", "dusra", "eradane"]],
+  [2, ["third", "3rd", "ಮೂರನೇ", "तीसरा", "तीसरे", "तीसरी", "teesra", "tisra", "moorane"]],
+  [3, ["fourth", "4th", "ನಾಲ್ಕನೇ", "चौथा", "चौथे", "चौथी", "chautha", "naalkane"]],
   [-1, ["last", "ಕೊನೆಯ", "ಕೊನೆಯದು", "आख़िरी", "आखिरी"]],
 ];
 const CARDINALS: [number, string[]][] = [
@@ -272,7 +331,7 @@ function radiusFromAmount(text: string): string | null {
 /** The one choice a spoken answer picks, or null when it's unclear. */
 export function matchOne(field: ChoiceField, text: string): string | null {
   const options = CHOICES[field];
-  const s = scores(text, options);
+  const s = scores(text, field);
   const best = Math.max(...s);
   if (best > 0) {
     const winners = options.filter((_, i) => s[i] === best);
@@ -289,7 +348,9 @@ export function matchMany(field: ChoiceField, text: string): string[] {
   const options = CHOICES[field];
   const t = norm(text);
   if (ALL_WORDS.some((w) => hit(t, w))) return options.map((o) => o.value);
-  const s = scores(text, options);
+  // A misspelling only counts when nothing is named outright: in "FoodFlow delivers",
+  // "delivers" belongs to FoodFlow, not to "you deliver".
+  const s = scores(text, field);
   return options.filter((_, i) => s[i] > 0).map((o) => o.value);
 }
 
@@ -378,6 +439,9 @@ export const LINES = {
   badPhone: { en: "I heard {n} digits. Please say all 10 digits of your mobile number again.", kn: "ನಾನು {n} ಅಂಕಿಗಳನ್ನು ಕೇಳಿದೆ. ದಯವಿಟ್ಟು ಮೊಬೈಲ್ ನಂಬರ್‌ನ ಎಲ್ಲಾ 10 ಅಂಕಿಗಳನ್ನು ಮತ್ತೆ ಹೇಳಿ.", hi: "मैंने {n} अंक सुने। कृपया मोबाइल नंबर के सभी 10 अंक फिर से बोलें।" },
   badPin: { en: "A PIN code has 6 digits, and I heard {n}. Please say it again.", kn: "ಪಿನ್ ಕೋಡ್‌ನಲ್ಲಿ 6 ಅಂಕಿಗಳಿರುತ್ತವೆ, ನಾನು {n} ಕೇಳಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ.", hi: "पिन कोड में 6 अंक होते हैं, मैंने {n} सुने। कृपया फिर से बोलें।" },
   unclear: { en: "Sorry, I didn't catch that. You can also tap your answer on the screen.", kn: "ಕ್ಷಮಿಸಿ, ಅರ್ಥವಾಗಲಿಲ್ಲ. ಪರದೆಯ ಮೇಲೆ ಉತ್ತರವನ್ನು ಟ್ಯಾಪ್ ಕೂಡ ಮಾಡಬಹುದು.", hi: "माफ़ कीजिए, समझ नहीं पाई। आप स्क्रीन पर जवाब टैप भी कर सकते हैं।" },
+  options: { en: "You can say {options}.", kn: "ನೀವು {options} ಎಂದು ಹೇಳಬಹುದು.", hi: "आप {options} बोल सकते हैं।" },
+  unclearOptions: { en: "Sorry, I didn't catch that. You can say {options}, or tap it on the screen.", kn: "ಕ್ಷಮಿಸಿ, ಅರ್ಥವಾಗಲಿಲ್ಲ. ನೀವು {options} ಎಂದು ಹೇಳಬಹುದು, ಅಥವಾ ಪರದೆಯ ಮೇಲೆ ಒತ್ತಬಹುದು.", hi: "माफ़ कीजिए, समझ नहीं पाई। आप {options} बोल सकते हैं, या स्क्रीन पर दबा सकते हैं।" },
+  yesOrNo: { en: "Just say yes or no.", kn: "ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಹೇಳಿ.", hi: "बस हाँ या नहीं बोलिए।" },
   noCrop: { en: "I didn't catch a crop name. Try saying: tomato, onion.", kn: "ಬೆಳೆಯ ಹೆಸರು ಅರ್ಥವಾಗಲಿಲ್ಲ. ಹೀಗೆ ಹೇಳಿ: ಟೊಮೇಟೊ, ಈರುಳ್ಳಿ.", hi: "फ़सल का नाम समझ नहीं आया। ऐसे बोलें: टमाटर, प्याज़।" },
   crops: { en: "Added {crops}.", kn: "{crops} ಸೇರಿಸಿದ್ದೇನೆ.", hi: "{crops} जोड़ दिए।" },
   declined: { en: "No problem. You'll need to tick that box before the account can be created.", kn: "ಪರವಾಗಿಲ್ಲ. ಖಾತೆ ತೆರೆಯುವ ಮೊದಲು ಆ ಬಾಕ್ಸ್ ಟಿಕ್ ಮಾಡಬೇಕಾಗುತ್ತದೆ.", hi: "कोई बात नहीं। खाता बनाने से पहले वह बॉक्स टिक करना होगा।" },

@@ -1,10 +1,12 @@
-// Checkout: delivery vs self-pickup, service-area check, slot, simulated
-// payment method, and a live server quote (one order per farmer). Pay →
-// authorise → reserve stock → capture, then a success screen with order
+// Checkout: delivery vs self-pickup, service-area check, slot, payment
+// method, and a live server quote (one order per farmer). With Razorpay set
+// up, Pay opens Razorpay Checkout and the server verifies the payment
+// before placing orders; without it, the labelled simulated flow runs
+// (authorise → reserve stock → capture). Then a success screen with order
 // codes and tracking links.
 "use client";
 
-import { AlertTriangle, ArrowRight, CreditCard, Home, Info, Loader2, MapPin, Smartphone, Store } from "lucide-react";
+import { AlertTriangle, ArrowRight, CreditCard, FlaskConical, Home, Info, Loader2, MapPin, ShieldCheck, Smartphone, Store } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
@@ -18,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SERVICE_AREAS, UNSERVED_AREAS } from "@/lib/areas";
 import { ApiError, fetcher, sendJSON } from "@/lib/fetcher";
 import { formatINR, formatQty } from "@/lib/format";
+import { openRazorpay, type RazorpayStart } from "@/lib/payments/razorpay-checkout";
 import { useCart } from "@/lib/store/cart";
 import { cn } from "@/lib/utils";
 import { PaymentSheet, type PayPhase } from "./payment-sheet";
@@ -34,8 +37,18 @@ interface Quote {
 interface PlaceResult {
   groupId: string;
   placed: { id: string; code: string; farmerId: string; farmerName: string; total: number }[];
-  failed: { farmerId: string; farmerName: string; reason: string }[];
+  /** refund: only for Razorpay payments, where a farm's share was already paid */
+  failed: { farmerId: string; farmerName: string; total: number; reason: string; refund?: "refunded" | "pending" | "none" }[];
   total: number;
+  /** Razorpay only */
+  paid?: number;
+  paymentId?: string;
+  method?: string;
+}
+
+export interface Gateway {
+  provider: "razorpay";
+  testMode: boolean;
 }
 
 const noop = () => () => {};
@@ -59,8 +72,11 @@ function postQuote([url, body]: [string, string]) {
   return fetcher<Quote>(url, { method: "POST", headers: { "Content-Type": "application/json" }, body });
 }
 
-/** @param profile - buyer's saved area and address for prefill */
-export function CheckoutView({ profile }: { profile: { area: string | null; address: string | null } }) {
+/**
+ * @param profile - buyer's saved area and address for prefill
+ * @param gateway - Razorpay when the server has keys, else null (simulated payment)
+ */
+export function CheckoutView({ profile, gateway }: { profile: { area: string | null; address: string | null }; gateway: Gateway | null }) {
   const mounted = useSyncExternalStore(noop, () => true, () => false);
   const items = useCart((s) => s.items);
   const setQty = useCart((s) => s.setQty);
@@ -75,6 +91,8 @@ export function CheckoutView({ profile }: { profile: { area: string | null; addr
   const [method, setMethod] = useState<"UPI" | "CARD">("UPI");
   const [phase, setPhase] = useState<PayPhase | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
+  const [paymentRef, setPaymentRef] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [result, setResult] = useState<PlaceResult | null>(null);
 
   const payload = { items: items.map((i) => ({ listingId: i.listingId, qty: i.qty })), fulfilment, area, addressLine: address, slot, paymentMethod: method };
@@ -82,8 +100,40 @@ export function CheckoutView({ profile }: { profile: { area: string | null; addr
   const { data: quote, error, isLoading } = useSWR<Quote, ApiError>(key, postQuote, { keepPreviousData: true, revalidateOnFocus: false });
   const outOfArea = Boolean(quote?.blocked);
 
+  async function finish(res: PlaceResult) {
+    setPhase("done");
+    removeFarmers(res.placed.map((p) => p.farmerId));
+    await new Promise((r) => setTimeout(r, 700));
+    setPhase(null);
+    setResult(res);
+  }
+
+  async function payWithRazorpay() {
+    setPayError(null);
+    setPaymentRef(null);
+    setNotice(null);
+    setPhase("opening");
+    try {
+      const start = await sendJSON<RazorpayStart>("/api/payments/razorpay/order", payload);
+      // Our sheet steps aside while Razorpay's own window is open.
+      setPhase(null);
+      const outcome = await openRazorpay(start);
+      if ("dismissed" in outcome) {
+        setNotice(outcome.lastError ? `${outcome.lastError}. You weren't charged, you can try again.` : "Payment cancelled, nothing was charged.");
+        return;
+      }
+      setPaymentRef(outcome.paid.razorpay_payment_id);
+      setPhase("verifying");
+      await finish(await sendJSON<PlaceResult>("/api/payments/razorpay/verify", outcome.paid));
+    } catch (e) {
+      setPayError((e as Error).message);
+      setPhase("error");
+    }
+  }
+
   async function pay() {
     if (!quote) return;
+    if (gateway) return payWithRazorpay();
     setPayError(null);
     setPhase("authorising");
     // The authorisation step is simulated client-side for the demo; the server
@@ -93,11 +143,7 @@ export function CheckoutView({ profile }: { profile: { area: string | null; addr
     try {
       const res = await sendJSON<PlaceResult>("/api/checkout", payload);
       await new Promise((r) => setTimeout(r, 600));
-      setPhase("done");
-      removeFarmers(res.placed.map((p) => p.farmerId));
-      await new Promise((r) => setTimeout(r, 700));
-      setPhase(null);
-      setResult(res);
+      await finish(res);
     } catch (e) {
       setPayError((e as Error).message);
       setPhase("error");
@@ -214,10 +260,32 @@ export function CheckoutView({ profile }: { profile: { area: string | null; addr
                   className={cn("flex min-h-14 items-center gap-3 rounded-2xl border px-4 text-sm font-medium", method === o.v && "border-foreground bg-muted/60")}
                 >
                   <o.icon className="size-5" /> {o.t}
-                  <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">demo</span>
+                  {!gateway && <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">demo</span>}
                 </button>
               ))}
             </div>
+            {gateway && (
+              <div className="mt-3 space-y-2 text-sm">
+                <p className="flex gap-2 text-muted-foreground">
+                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-foreground" />
+                  <span>
+                    Secured by <b className="text-foreground">Razorpay</b>. Your choice opens first; netbanking and wallets are there too. We never see your card or UPI PIN.
+                  </span>
+                </p>
+                {gateway.testMode && (
+                  <div className="flex gap-2 rounded-2xl border border-dashed p-3">
+                    <FlaskConical className="mt-0.5 size-4 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium">Razorpay test mode: no real money moves</p>
+                      <p className="mt-0.5 text-muted-foreground">
+                        UPI ID <code className="font-mono text-foreground">success@razorpay</code> (or <code className="font-mono">failure@razorpay</code>), or card{" "}
+                        <code className="font-mono whitespace-nowrap text-foreground">4100 2800 0000 1007</code> with any future expiry and CVV.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </Section>
         </div>
 
@@ -272,8 +340,16 @@ export function CheckoutView({ profile }: { profile: { area: string | null; addr
           )}
           <p className="flex gap-2 text-xs text-muted-foreground">
             <Info className="mt-0.5 size-3.5 shrink-0" />
-            We authorise the amount now and capture it only once each farm&apos;s stock is reserved. Farmers are paid after delivery is verified.
+            {gateway
+              ? "You pay through Razorpay, then we reserve each farm's stock. If a farm runs out in between, its share is refunded to you through Razorpay. Farmers are paid after delivery is verified."
+              : "We authorise the amount now and capture it only once each farm's stock is reserved. Farmers are paid after delivery is verified."}
           </p>
+          {notice && (
+            <p role="status" className="flex gap-2 rounded-xl bg-muted p-3 text-sm">
+              <Info className="mt-0.5 size-4 shrink-0" />
+              <span className="min-w-0">{notice}</span>
+            </p>
+          )}
           <div className="glass fixed inset-x-0 bottom-0 z-30 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:static lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
             <Button size="lg" variant="brand" className="w-full" onClick={pay} disabled={!quote || Boolean(quote.issues.length) || outOfArea || phase !== null}>
               Pay {quote ? formatINR(quote.total, true) : ""} <ArrowRight />
@@ -281,7 +357,14 @@ export function CheckoutView({ profile }: { profile: { area: string | null; addr
           </div>
         </aside>
       </div>
-      <PaymentSheet phase={phase} amount={quote ? formatINR(quote.total, true) : ""} error={payError} onClose={() => setPhase(null)} />
+      <PaymentSheet
+        phase={phase}
+        amount={quote ? formatINR(quote.total, true) : ""}
+        error={payError}
+        onClose={() => setPhase(null)}
+        mode={!gateway ? "simulated" : gateway.testMode ? "razorpay-test" : "razorpay"}
+        paymentRef={paymentRef}
+      />
     </div>
   );
 }
@@ -312,8 +395,9 @@ function Success({ result }: { result: PlaceResult }) {
         Order{result.placed.length > 1 ? "s" : ""} <span className="font-serif font-normal italic">placed</span>
       </h1>
       <p className="mt-2 max-w-sm text-muted-foreground">
-        {formatINR(result.total, true)} captured, your farmers are packing. Track each order live.
+        {result.method ? `${formatINR(result.total, true)} paid, ${result.method}.` : `${formatINR(result.total, true)} captured.`} Your farmers are packing. Track each order live.
       </p>
+      {result.paymentId && <p className="mt-1 font-mono text-xs text-muted-foreground">Razorpay ref {result.paymentId}</p>}
       <div className="mt-6 w-full max-w-md space-y-2">
         {result.placed.map((p) => (
           <Link key={p.id} href={`/shop/orders/${p.id}`} className="flex items-center justify-between rounded-2xl border bg-card p-4 text-left hover:border-foreground/30">
@@ -330,7 +414,12 @@ function Success({ result }: { result: PlaceResult }) {
           <div key={f.farmerId} className="flex gap-2 rounded-2xl bg-warning/12 p-4 text-left text-sm">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
             <span>
-              <b>{f.farmerName}:</b> {f.reason}. That part wasn&apos;t charged, it&apos;s still in your cart.
+              <b>{f.farmerName}:</b> {f.reason}.{" "}
+              {f.refund === "refunded"
+                ? `Its share (${formatINR(f.total, true)}) was refunded to you through Razorpay. It's still in your cart.`
+                : f.refund === "pending"
+                  ? `Its share (${formatINR(f.total, true)}) is owed back to you, the refund hasn't gone through yet. It's still in your cart.`
+                  : "That part wasn't charged, it's still in your cart."}
             </span>
           </div>
         ))}

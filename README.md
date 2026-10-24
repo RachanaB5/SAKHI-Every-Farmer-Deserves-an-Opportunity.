@@ -61,6 +61,17 @@ How it stays trustworthy:
   ಐನೂರು*), order codes letter by letter, and replies sentence by sentence. Replies are fixed templates with
   numbers from the database. Kannada is never read by an English voice: where a device has no Kannada voice
   (desktop Chrome), a Hindi voice reads it from Devanagari letters, and the panel says so.
+- **A real Kannada voice.** Browsers rarely have one (desktop Chrome has none), so FoodFlow speaks Kannada
+  itself: SYSPIN's open Kannada female voice from IISc Bangalore (CC BY 4.0), converted to ONNX and run on
+  the server with onnxruntime-node (`/api/tts`). Names, *FoodFlow* and order codes inside Kannada lines are
+  written in Kannada letters first, so they are pronounced, not skipped. Sakhi's fixed lines are recorded
+  once and cached. Build it with `npm run voice:kannada` (see [Configuration](#configuration)); without
+  it, a Kannada voice on the device is used, or a Hindi voice reads the Kannada and the panel says so.
+- **Understands more than the options.** Shortcuts and slips pick the right answer (*"rest"*, *"resturant"*,
+  *"the 2nd one"*, *"ಸಣ್ಣ"*, *"gpay and cash"*), and many more ways of saying yes and no (*"ಆಯ್ತು"*,
+  *"हाँ जी"*, *"not now"*). Questions get answers instead of "I don't know": *"what is this app?"*,
+  *"ಇದು ಉಚಿತವಾ?"*, *"पैसे कब मिलेंगे?"*, *"why do you need my number?"*, *"what are the options?"*. During
+  sign-up Sakhi answers, then asks the pending question again, so a question is never saved as an answer.
 - **From sign-up to first listing, by voice.** On seller sign-up, Sakhi asks every question out loud
   in Kannada, Hindi or English (the screens switch language too) and fills the form from the answers:
   *"ನನ್ನ ಹೆಸರು ರಮೇಶ್"*, *"ದೊಡ್ಡಬಳ್ಳಾಪುರ"* (district, nearest service area and PIN code follow), *"ಟೊಮೇಟೊ
@@ -124,11 +135,18 @@ addresses. Messages from the home page's contact form are stored in the `Contact
 
 To start over with fresh sample data at any time: `npm run db:reset`.
 
+**Pay with Razorpay** (optional, free in Test Mode): sign up at [razorpay.com](https://razorpay.com), switch the
+dashboard to **Test Mode**, open *Account & Settings → API Keys → Generate Test Key*, put the two values in `.env`
+as `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`, and restart `npm run dev`. Checkout then opens Razorpay's own
+payment window; pay with UPI ID `success@razorpay` or card `4100 2800 0000 1007` (any future expiry, any CVV).
+Test Mode moves no real money. Without keys, checkout keeps its clearly labelled simulated payment. See
+[Payments](#payments-razorpay).
+
 ### Demo script
 
 1. **Farmer** (Ramesh) → *New harvest* → tap the mic and say *“50 kilo tamatar, aaj tode, 25 rupaye kilo”* (or type it) → check the parsed fields → add photos → see the visual score and price advice → *Send for verification*.
 2. **Admin** → *Review* → approve Ramesh's batch; open Ravi's tomato batch, see the duplicate-photo flag, and reject it.
-3. **Household** (Ananya) → *AI basket* → type or snap a grocery list → *Build my smart basket* → swap farms if you like → checkout with delivery.
+3. **Household** (Ananya) → *AI basket* → type or snap a grocery list → *Build my smart basket* → swap farms if you like → checkout with delivery. With Razorpay test keys set, *Pay* opens Razorpay: pay with `success@razorpay`, and the order page shows the Razorpay payment id; cancel the order and the refund id appears.
 4. **Farmer** → *Orders* → mark packed → *Book delivery*. **Delivery** (Imran) → open the run → *Picked up* → ask the household for the OTP (shown on their order page) → enter it → delivered. The farmer's *Payments* shows the settlement as pending.
 5. **Restaurant** (The Green Ladle) → *Post* an urgent 50 kg onion demand → as farmers, make two offers → back as the restaurant, the offers are ranked → accept one.
 6. **Farmer** → *Surplus* → a slow-selling spinach lot is flagged → offer it to Annapurna's open demand in one tap.
@@ -189,14 +207,36 @@ stateDiagram-v2
 | **Offer ranking** | Cost as a ratio to the cheapest delivered price, plus quantity, ETA, visual quality, distance and reliability (30/20/15/15/10/10); ×0.6 if it misses the deadline. The model may only explain, not reorder. | `lib/ranking.ts` |
 | **Smart basket** | Per item, scores nearby listings on price, ETA, freshness and visual quality, with a bonus for farms that cover several items (fewer deliveries). | `lib/basket.ts` |
 | **Surplus rescue** | At risk when sell-through is below the threshold after the minimum age, or the harvest has used most of its shelf life. Rescue offers go to open community-kitchen demand at the buyer's target, never below 70% of the mandi rate. | `lib/surplus.ts` |
+| **Payments** | Razorpay Checkout when keys are set: the server prices the cart and opens a Razorpay order; orders are created only after the payment's signature, order, amount and capture are confirmed with Razorpay. Verify and webhook race safely (one claims, the other reads). A farm that ran out after payment, a cancellation or a refunded dispute is refunded through Razorpay's API. | `lib/payments/` |
 | **Subscriptions** | IST slot scheduling; a run claims the plan with a conditional update so overlapping schedulers place one order; falls back to the same farmer, then any farm, when stock runs out. | `lib/subscriptions.ts` |
 | **Trust & safety** | SHA-256 duplicate-photo detection across batches, complaint-rate flags, price outliers vs. the mandi reference. Flags only — suspension and pausing are human actions, audit-logged. | `lib/trust.ts` |
+
+### Payments (Razorpay)
+
+| | With Razorpay keys | Without keys |
+| --- | --- | --- |
+| Buyer checkout | Razorpay Checkout (UPI, cards, netbanking, wallets) | Simulated: authorise → reserve stock → capture, labelled *demo* |
+| When orders appear | Only after Razorpay confirms the payment | Immediately |
+| Cancellation, stock-out after payment, refunded dispute | Refunded through Razorpay; the refund id shows on the order | Marked refunded (simulated) |
+| Subscription runs and accepted bulk offers | Simulated (recurring mandates are not integrated) | Simulated |
+| Farmer payouts (settlements) | Recorded and released by admins; no money is sent out (RazorpayX payouts are not integrated) | Same |
+
+The flow: `POST /api/payments/razorpay/order` prices the cart and stores it as a `PaymentIntent`.
+Razorpay Checkout opens in the browser, and `POST /api/payments/razorpay/verify` checks Razorpay's
+HMAC signature, fetches the payment from Razorpay (right order, full amount, captured, capturing it if it
+was only authorised) and places one order per farm. `POST /api/payments/razorpay/webhook` does the same
+for a buyer who closed the tab right after paying; set it up in the Razorpay dashboard with the events
+`payment.authorized`, `payment.captured`, `payment.failed` and `order.paid`, and put its secret in
+`RAZORPAY_WEBHOOK_SECRET` (Razorpay can't reach `localhost`, so use a tunnel or a deployed URL).
+Card and UPI details are typed into Razorpay's window; FoodFlow stores only Razorpay's order, payment and
+refund ids.
 
 ## Tech stack
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript (strict) · Tailwind CSS 4 · shadcn/ui ·
 Framer Motion · React Three Fiber · Recharts · Prisma 6 (SQLite locally, Postgres for deploy) · Zod ·
-jose (JWT sessions) · SWR · Zustand · sharp · Vitest · Playwright (responsive QA script).
+jose (JWT sessions) · SWR · Zustand · sharp · Razorpay (Checkout + REST API, no SDK) · Vitest ·
+Playwright (responsive QA script) · Firebase Authentication · Firestore.
 
 ## Scripts
 
@@ -205,11 +245,12 @@ jose (JWT sessions) · SWR · Zustand · sharp · Vitest · Playwright (responsi
 | `npm run setup` | First run: creates `.env` with a random secret, applies migrations, seeds demo data |
 | `npm run dev` | Development server on http://localhost:3000 |
 | `npm run build` / `npm start` | Production build and server |
-| `npm test` | Vitest suite — inventory races, OTP rules, fee maths, ranking, subscriptions, parsers |
+| `npm test` | Vitest suite — inventory races, OTP rules, fee maths, ranking, subscriptions, parsers, Razorpay payments (against a stand-in API) |
 | `npm run lint` / `npm run typecheck` | ESLint (zero warnings) and TypeScript |
+| `npm run db:firestore:import` | Dry-run a copy of Prisma records into Firestore; add `-- --write` to import |
 | `npm run db:reset` | Recreate the database and reseed the demo |
 | `npm run db:studio` | Browse the data in Prisma Studio |
-| `npm run db:firestore:import` | Dry-run a copy of Prisma records into Firestore; add `-- --write` to import |
+| `npm run voice:kannada` | Download SYSPIN's open Kannada voice and convert it for the server (one time: a 333 MB download, 115 MB kept on disk) |
 | `node scripts/screenshots.mjs --role FARMER /farmer` | Screenshot pages at 360 / 768 / 1280 px and flag overflow and console errors |
 
 ## Configuration
@@ -230,6 +271,9 @@ Copy `.env.example` to `.env` (`npm run setup` does this for you).
 | `NEXT_PUBLIC_FIREBASE_*` | no | Firebase web app configuration for the modular client SDK |
 | `FIREBASE_PROJECT_ID` | no | Firebase project used by the Admin SDK and import script |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | no | Server-only service account JSON; alternatively configure Application Default Credentials |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | no | Turn on Razorpay checkout and refunds. Test keys (`rzp_test_…`) are free and move no real money |
+| `RAZORPAY_WEBHOOK_SECRET` | no | Verifies `/api/payments/razorpay/webhook`, which places orders if a buyer closes the tab after paying |
+| `KANNADA_VOICE_DIR` | no | Where Sakhi's Kannada voice model lives (default `models/kn-female`, built by `npm run voice:kannada`, which needs Python with `torch`, `onnx` and `onnxruntime`). Without it Kannada uses the device's voices |
 
 ### Firebase authentication and Firestore migration
 

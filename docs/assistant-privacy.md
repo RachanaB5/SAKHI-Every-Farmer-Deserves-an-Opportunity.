@@ -66,9 +66,12 @@ page explains what happens to a farmer's voice and words, in plain terms.
 
 ## Speaking back
 
-- Replies are spoken with the device's built-in voices (`speechSynthesis`); FoodFlow sends no text
-  anywhere to be spoken. (Some browsers' "online" voices are themselves provided by the browser vendor's
-  service.)
+- English and Hindi replies are spoken with the device's built-in voices (`speechSynthesis`). (Some
+  browsers' "online" voices are themselves provided by the browser vendor's service.)
+- Kannada replies are spoken by FoodFlow's own Kannada voice when the server has it installed: the reply
+  text (one sentence at a time) goes to FoodFlow's server at `/api/tts`, never to a third party, and comes
+  back as audio. The audio of each sentence is cached on the server so it isn't made twice; a sentence can
+  contain the farmer's name or an amount. Nothing the farmer says is sent this way, only Sakhi's replies.
 - The voice is chosen automatically: Indian English first for English (so names, places and crops are
   pronounced the way farmers say them), then the most natural voice on the device. The farmer can pick a
   female or male voice, a specific voice and a speed; that choice is saved in this browser only.

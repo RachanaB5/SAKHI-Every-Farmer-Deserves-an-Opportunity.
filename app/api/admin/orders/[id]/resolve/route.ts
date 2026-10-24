@@ -1,5 +1,6 @@
 // POST /api/admin/orders/[id]/resolve { action, note } — close a dispute.
-//   REFUND  → payment REFUNDED (simulated), order CANCELLED, an unpaid
+//   REFUND  → payment REFUNDED (through Razorpay when it was paid there,
+//             simulated otherwise), order CANCELLED, an unpaid
 //             settlement is reversed to ₹0 (a settled one is flagged for recovery)
 //   DISMISS → order back to DELIVERED / COLLECTED, payout unaffected
 import { z } from "zod";
@@ -8,6 +9,7 @@ import { handler, HttpError } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { withTxRetry } from "@/lib/inventory";
 import { notify } from "@/lib/orders/lifecycle";
+import { refundGatewayPayment } from "@/lib/payments/refunds";
 import { moveOrder } from "@/lib/orders/state";
 import { recomputeReliability } from "@/lib/reliability";
 
@@ -29,7 +31,7 @@ export const POST = handler<z.infer<typeof body>, undefined, Params>({ roles: ["
     }
     const ok = await moveOrder(tx, order.id, "CANCELLED", { from: ["DISPUTED"], actorId: user.id, note: `Refunded: ${body.note}`, data: { cancelReason: `Refunded after dispute, ${body.note}` } });
     if (!ok) throw new HttpError(409, "Order changed, refresh and try again");
-    if (order.payment) await tx.payment.update({ where: { orderId: order.id }, data: { status: "REFUNDED", refundedAt: new Date() } });
+    if (order.payment && order.payment.provider !== "RAZORPAY") await tx.payment.update({ where: { orderId: order.id }, data: { status: "REFUNDED", refundedAt: new Date() } });
     if (order.settlement?.status === "PENDING") {
       // Farmer hasn't been paid yet: reverse the payout instead of paying for rejected goods.
       await tx.settlement.update({ where: { orderId: order.id }, data: { net: 0, platformFee: 0, deliveryCost: 0 } });
@@ -37,8 +39,9 @@ export const POST = handler<z.infer<typeof body>, undefined, Params>({ roles: ["
       recovery = true;
     }
   });
-  await audit({ actorId: user.id, action: body.action === "REFUND" ? "DISPUTE_REFUNDED" : "DISPUTE_DISMISSED", entity: "Order", entityId: order.id, meta: { note: body.note, amount: order.total, recovery } });
+  const refund = body.action === "REFUND" ? await refundGatewayPayment(order.id, `Dispute refunded: ${body.note}`) : "none";
+  await audit({ actorId: user.id, action: body.action === "REFUND" ? "DISPUTE_REFUNDED" : "DISPUTE_DISMISSED", entity: "Order", entityId: order.id, meta: { note: body.note, amount: order.total, recovery, refund } });
   await recomputeReliability(order.farmerId);
   await notify(order.id);
-  return { resolved: body.action, recoveryNeeded: recovery };
+  return { resolved: body.action, recoveryNeeded: recovery, refund };
 });

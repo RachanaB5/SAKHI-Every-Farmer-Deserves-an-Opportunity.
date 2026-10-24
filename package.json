@@ -19,7 +19,8 @@
     "db:postgres": "node scripts/use-postgres.mjs --force",
     "db:firestore:import": "tsx scripts/migrate-to-firestore.ts",
     "postinstall": "prisma generate",
-    "setup": "node scripts/setup.mjs"
+    "setup": "node scripts/setup.mjs",
+    "voice:kannada": "python scripts/kannada-voice/export.py"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -71,5 +72,8 @@
   },
   "engines": {
     "node": ">=20.9"
+  },
+  "optionalDependencies": {
+    "onnxruntime-node": "^1.30.0"
   }
 }

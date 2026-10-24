@@ -6,6 +6,7 @@ import type { User } from "@prisma/client";
 import { HttpError } from "@/lib/api";
 import { CROPS } from "@/lib/crops";
 import type { ConfirmPayload } from "../confirm";
+import { matchFaq, WHY_ANSWERS } from "../faq";
 import type { AssistantContext, AssistantLang, Entities, ParseResult } from "../intents";
 import { crop, reply, say, unitWord } from "../reply";
 import type { AssistantReply } from "../types";
@@ -29,6 +30,16 @@ function askFor(parsed: ParseResult, lang: AssistantLang): AssistantReply {
   return reply(parsed.intent, lang, "ff.say.unsupported");
 }
 
+/** A question about FoodFlow itself (what it is, fees, getting paid…), or null. Help keeps its own reply. */
+function faqReply(transcript: string, lang: AssistantLang, opts: { answering?: boolean } = {}): AssistantReply | null {
+  const f = matchFaq(transcript, opts);
+  if (!f || f.topic === "help" || f.topic === "options") return null;
+  const answer = f.topic === "why" ? WHY_ANSWERS.general : f.answer;
+  // A greeting gets the usual "Namaskara! How can I help…" reply.
+  const text = f.topic === "greet" ? say(lang, "ff.say.smalltalk") : answer[lang];
+  return { ok: true, intent: f.topic === "greet" || f.topic === "thanks" ? "SMALLTALK" : "HELP", lang, speech: text, display: text };
+}
+
 /**
  * Answers one understood utterance for the signed-in farmer.
  * @param transcript - what the farmer said, kept on new drafts as evidence
@@ -38,7 +49,17 @@ export async function handleIntent(user: User, parsed: ParseResult, lang: Assist
   if (!e.draftId && parsed.intent === "PUBLISH_LISTING") e.draftId = ctx?.lastDraftId ?? null;
   if (!e.demandId && ["RESPOND_TO_OFFER", "CAN_FULFIL_DEMAND"].includes(parsed.intent)) e.demandId = ctx?.lastDemandId ?? null;
   const missing = parsed.missing.filter((f) => e[f as keyof Entities] == null);
-  if (missing.length && parsed.intent !== "PUBLISH_LISTING") return askFor({ ...parsed, entities: e, missing }, lang);
+  // Not an action: maybe a question about FoodFlow itself.
+  if (["UNSUPPORTED", "HELP", "SMALLTALK"].includes(parsed.intent)) {
+    const faq = faqReply(transcript, lang);
+    if (faq) return faq;
+  }
+  if (missing.length && parsed.intent !== "PUBLISH_LISTING") {
+    // A question asked in the middle of a follow-up is answered, and the follow-up stays open.
+    const faq = ctx?.pending ? faqReply(transcript, lang, { answering: true }) : null;
+    if (faq) return { ...faq, followUp: { intent: parsed.intent, entities: e, missing } };
+    return askFor({ ...parsed, entities: e, missing }, lang);
+  }
 
   switch (parsed.intent) {
     case "CREATE_LISTING_DRAFT":

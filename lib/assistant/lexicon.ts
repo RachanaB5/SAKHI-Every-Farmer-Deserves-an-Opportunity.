@@ -63,14 +63,25 @@ export const PERIOD_TERMS: [string, Period][] = [
 ];
 
 /** Yes / no words used to answer a visible confirmation card by voice. */
-export const YES_WORDS = ["yes", "yeah", "yep", "ok", "okay", "confirm", "sure", "haan", "ha", "haa", "ji haan", "theek hai", "thik hai", "हाँ", "हां", "जी", "ठीक है", "हो", "ಹೌದು", "howdu", "houdu", "sari", "ಸರಿ", "aagali", "ಆಗಲಿ"];
-export const NO_WORDS = ["no", "nope", "cancel", "stop", "nahi", "nahin", "mat", "नहीं", "नही", "रद्द", "ಇಲ್ಲ", "illa", "beda", "ಬೇಡ", "ರದ್ದು"];
+export const YES_WORDS = [
+  "yes", "yeah", "yep", "yup", "ya", "ok", "okay", "confirm", "sure", "of course", "definitely", "correct", "right", "that's right", "agreed", "i agree", "go ahead", "please do",
+  "haan", "ha", "haa", "haanji", "haan ji", "ji haan", "theek hai", "thik hai", "bilkul", "zaroor", "jaroor", "accha", "acha",
+  "हाँ", "हां", "जी", "जी हाँ", "हाँ जी", "ठीक है", "हो", "बिल्कुल", "ज़रूर", "जरूर", "सही", "सही है", "ओके", "अच्छा",
+  "ಹೌದು", "howdu", "houdu", "sari", "ಸರಿ", "aagali", "ಆಗಲಿ", "ಆಯ್ತು", "aaytu", "ಹೂಂ", "ಹೂ", "hoon", "ಓಕೆ", "ಖಂಡಿತ", "khandita", "ಒಪ್ಪುತ್ತೇನೆ", "ಹೌದು ಹೌದು",
+];
+export const NO_WORDS = [
+  "no", "nope", "nah", "not now", "never", "don't", "dont", "cancel", "stop", "not yet", "i disagree",
+  "nahi", "nahin", "mat", "na", "naa", "नहीं", "नही", "ना", "मत", "रद्द", "अभी नहीं",
+  "ಇಲ್ಲ", "ಇಲ್ಲಾ", "illa", "beda", "ಬೇಡ", "ಬೇಡಾ", "ರದ್ದು", "ಈಗ ಬೇಡ", "ನೋ",
+];
 
 /** Answer to a yes/no question, or null when the reply is something else. */
 export function yesNo(text: string): "yes" | "no" | null {
   const t = text.toLowerCase().normalize("NFC").replace(/[.!?,।]/g, "").trim();
   if (!t) return null;
   if (NO_WORDS.some((w) => t === w || t.startsWith(`${w} `))) return "no";
+  // "that's not right", "not correct"
+  if (/(^|\s)not(\s|$)/.test(t)) return "no";
   if (YES_WORDS.some((w) => t === w || t.startsWith(`${w} `) || t.endsWith(` ${w}`))) return "yes";
   return null;
 }

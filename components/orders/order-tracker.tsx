@@ -138,13 +138,18 @@ export function OrderTimeline({ order }: { order: SerializedOrder }) {
   );
 }
 
-/** Honest payment trail: authorised → captured (→ refunded). */
+/** Honest payment trail: authorised → captured (→ refunded), or paid on Razorpay (→ refunded through it). */
 export function PaymentTrail({ order }: { order: SerializedOrder }) {
   const p = order.payment;
   if (!p) return null;
+  const gateway = p.provider === "RAZORPAY";
   const steps = [
-    { k: "Authorised", at: p.authorisedAt, on: true },
-    { k: "Captured", at: p.capturedAt, on: Boolean(p.capturedAt) },
+    ...(gateway
+      ? [{ k: "Paid on Razorpay", at: p.authorisedAt, on: true }]
+      : [
+          { k: "Authorised", at: p.authorisedAt, on: true },
+          { k: "Captured", at: p.capturedAt, on: Boolean(p.capturedAt) },
+        ]),
     ...(p.refundedAt ? [{ k: "Refunded", at: p.refundedAt, on: true }] : []),
   ];
   return (
@@ -160,14 +165,18 @@ export function PaymentTrail({ order }: { order: SerializedOrder }) {
           </span>
         ))}
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="mt-2 text-xs break-words text-muted-foreground">
         {p.status === "FAILED"
           ? p.failureReason ?? "Authorisation released, you weren't charged."
           : p.status === "REFUNDED"
-            ? "Refunded to your original payment method (simulated)."
-            : p.status === "CAPTURED"
-              ? `${p.method}, ref ${p.ref}. The farmer is paid only after the handover is verified.`
-              : "Held on your account, not yet charged."}
+            ? gateway
+              ? `Refunded through Razorpay${p.refundRef ? `, refund ref ${p.refundRef}` : ""}. Banks usually take 5 to 7 working days to show it.`
+              : "Refunded to your original payment method (simulated)."
+            : gateway && p.failureReason
+              ? `${p.failureReason}. Payment ref ${p.ref}.`
+              : p.status === "CAPTURED" || gateway
+                ? `${p.method}, ref ${p.ref}. The farmer is paid only after the handover is verified.`
+                : "Held on your account, not yet charged."}
       </p>
     </div>
   );

@@ -72,6 +72,13 @@ enum PaymentStatus {
   FAILED
 }
 
+/// A gateway checkout: waiting for the buyer, paid (orders placed), or failed.
+enum PaymentIntentStatus {
+  CREATED
+  PAID
+  FAILED
+}
+
 enum SettlementStatus {
   PENDING
   SETTLED
@@ -132,35 +139,36 @@ model User {
   suspended        Boolean  @default(false)
   createdAt        DateTime @default(now())
 
-  farmerProfile FarmerProfile?
-  addresses     Address[]
-  onboarding    OnboardingProfile?
-  batches       Batch[]
-  listings      Listing[]
-  orders        Order[]         @relation("BuyerOrders")
-  farmerOrders  Order[]         @relation("FarmerOrders")
-  orderItems    OrderItem[]
-  settlements   Settlement[]
-  deliveries    Delivery[]      @relation("WorkerDeliveries")
-  demands       DemandRequest[]
-  offers        Offer[]
-  subscriptions Subscription[]
-  feedback      Feedback[]
-  auditLogs     AuditLog[]
+  farmerProfile  FarmerProfile?
+  addresses      Address[]
+  onboarding     OnboardingProfile?
+  batches        Batch[]
+  listings       Listing[]
+  orders         Order[]            @relation("BuyerOrders")
+  farmerOrders   Order[]            @relation("FarmerOrders")
+  orderItems     OrderItem[]
+  settlements    Settlement[]
+  deliveries     Delivery[]         @relation("WorkerDeliveries")
+  demands        DemandRequest[]
+  offers         Offer[]
+  subscriptions  Subscription[]
+  feedback       Feedback[]
+  auditLogs      AuditLog[]
+  paymentIntents PaymentIntent[]
 
   @@index([role])
 }
 
 model FarmerProfile {
-  id       String  @id @default(cuid())
-  userId   String  @unique
-  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  farmName String
-  village  String
+  id                   String  @id @default(cuid())
+  userId               String  @unique
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farmName             String
+  village              String
   /// string[] of crop slugs the farmer grows
-  crops    Json
-  bio      String?
-  upiId    String?
+  crops                Json
+  bio                  String?
+  upiId                String?
   /// Sakhi: the one-time welcome has been shown
   assistantWelcomeSeen Boolean @default(false)
   /// Sakhi: speak the welcome / replies automatically
@@ -349,19 +357,53 @@ model OrderEvent {
   @@index([orderId])
 }
 
-/// Simulated payment. AUTHORISED at checkout, CAPTURED once stock is reserved.
+/// Payment for one order. AUTHORISED at checkout, CAPTURED once stock is
+/// reserved. Simulated unless `provider` is RAZORPAY, in which case the
+/// gateway's order, payment and refund ids are kept.
 model Payment {
-  id            String        @id @default(cuid())
-  orderId       String        @unique
-  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  status        PaymentStatus
-  amount        Float
-  method        String        @default("UPI (simulated)")
-  ref           String
-  authorisedAt  DateTime      @default(now())
-  capturedAt    DateTime?
-  refundedAt    DateTime?
-  failureReason String?
+  id                String        @id @default(cuid())
+  orderId           String        @unique
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status            PaymentStatus
+  amount            Float
+  method            String        @default("UPI (simulated)")
+  ref               String
+  authorisedAt      DateTime      @default(now())
+  capturedAt        DateTime?
+  refundedAt        DateTime?
+  failureReason     String?
+  /// SIMULATED or RAZORPAY
+  provider          String        @default("SIMULATED")
+  /// Gateway order shared by every order paid in one checkout
+  providerOrderId   String?
+  providerPaymentId String?
+  providerRefundId  String?
+}
+
+/// One gateway checkout: the cart priced on the server, waiting for the
+/// buyer to pay. Orders are created only after the payment is verified,
+/// so farmers never see an unpaid cart.
+model PaymentIntent {
+  id                String              @id @default(cuid())
+  buyerId           String
+  buyer             User                @relation(fields: [buyerId], references: [id])
+  provider          String              @default("RAZORPAY")
+  providerOrderId   String              @unique
+  providerPaymentId String?             @unique
+  /// Rupees (the gateway order itself is in paise)
+  amount            Float
+  currency          String              @default("INR")
+  /// { input, quote }: the checkout request and the server quote it was priced from
+  checkout          Json
+  status            PaymentIntentStatus @default(CREATED)
+  method            String?
+  /// Orders placed from this payment share this groupId
+  groupId           String?
+  failureReason     String?
+  createdAt         DateTime            @default(now())
+  paidAt            DateTime?
+
+  @@index([buyerId])
 }
 
 /// Farmer payout for one delivered order. Created PENDING on verified handover.

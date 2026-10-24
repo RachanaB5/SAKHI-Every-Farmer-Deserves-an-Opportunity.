@@ -61,6 +61,8 @@ export function serializeOrder(o: OrderRow, viewer: Pick<User, "id" | "role">) {
       capturedAt: o.payment.capturedAt?.toISOString() ?? null,
       refundedAt: o.payment.refundedAt?.toISOString() ?? null,
       failureReason: o.payment.failureReason,
+      provider: o.payment.provider,
+      refundRef: o.payment.providerRefundId,
     },
     settlement:
       (isFarmer || isAdmin) && o.settlement
