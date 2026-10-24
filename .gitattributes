@@ -1,0 +1,8 @@
+# Normalise line endings so Windows and Unix contributors produce identical diffs.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.mp4 binary

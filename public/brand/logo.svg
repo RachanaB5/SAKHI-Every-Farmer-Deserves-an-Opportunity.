@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 170" role="img" aria-label="FoodFlow">
+  <defs>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7cbf4e"/>
+      <stop offset="1" stop-color="#2f7d4a"/>
+    </linearGradient>
+    <linearGradient id="bean" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f8a6a"/>
+      <stop offset="1" stop-color="#1b5f7c"/>
+    </linearGradient>
+  </defs>
+  <circle cx="85" cy="85" r="85" fill="#e8eeee"/>
+  <!-- green leaf, upper left -->
+  <path d="M44 112C32 72 56 38 104 28C104 72 84 108 44 112Z" fill="url(#leaf)"/>
+  <path d="M50 108C62 84 78 60 98 40" fill="none" stroke="#e8eeee" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+  <!-- teal seed / bean, lower right -->
+  <path d="M70 116C66 92 98 76 128 80C150 83 152 112 128 128C106 142 74 140 70 116Z" fill="url(#bean)"/>
+  <path d="M82 118C90 104 108 96 128 96" fill="none" stroke="#e8eeee" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+  <!-- flow line with three nodes -->
+  <path d="M104 36C128 38 146 56 143 82" fill="none" stroke="#2a7f8f" stroke-width="5" stroke-linecap="round"/>
+  <path d="M143 82C140 100 130 112 112 120" fill="none" stroke="#2a7f8f" stroke-width="5" stroke-linecap="round" opacity="0"/>
+  <circle cx="104" cy="36" r="6.5" fill="#e8eeee" stroke="#2a7f8f" stroke-width="4"/>
+  <circle cx="143" cy="82" r="6.5" fill="#e8eeee" stroke="#2a7f8f" stroke-width="4"/>
+  <circle cx="88" cy="122" r="6.5" fill="#e8eeee" stroke="#1f6f86" stroke-width="4"/>
+</svg>

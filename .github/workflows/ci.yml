@@ -1,0 +1,147 @@
+# CI/CD for FoodFlow.
+#   CI — every pull request and every push to main: lint, type-check, unit
+#        tests, migration/schema checks and a production build.
+#   CD — pushes to main that pass CI are deployed to Vercel production.
+#        Needs the VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID
+#        repository secrets; without them the deploy job is skipped.
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Superseded PR runs are cancelled; runs on main always finish (they deploy).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NEXT_TELEMETRY_DISABLED: 1
+  PRISMA_HIDE_UPDATE_MESSAGE: 1
+  # Throwaway SQLite database and secret, so nothing needs a real .env.
+  DATABASE_URL: file:./ci.db
+  SESSION_SECRET: ci-only-secret-never-used-outside-ci-0000
+
+jobs:
+  verify:
+    name: Lint, types & tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # Route types live in .next/types, which only exists after typegen.
+      - name: Type-check
+        run: npx next typegen && npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      # `npm run setup` applies migrations, so schema edits without a
+      # migration would break fresh installs. Exit code 2 means drift.
+      - name: Migrations match schema.prisma
+        run: >
+          npx prisma migrate diff
+          --from-migrations prisma/migrations
+          --to-schema-datamodel prisma/schema.prisma
+          --shadow-database-url file:./ci-shadow.db
+          --exit-code
+
+      - name: Fresh setup (migrate + seed)
+        run: npx prisma migrate deploy && npx prisma db seed
+
+      # Deploys run on Postgres (scripts/use-postgres.mjs). This rewrites
+      # schema.prisma in the workspace, so it must stay the last step.
+      - name: Schema is valid on Postgres
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+        run: node scripts/use-postgres.mjs --force && npx prisma validate
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # Persist the Next.js build cache between runs (see Next's CI caching
+      # guide). Runs before `npm ci` so hashFiles never walks node_modules.
+      - uses: actions/cache@v6
+        with:
+          path: ${{ github.workspace }}/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx', '**/*.mjs', '**/*.css') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    name: Deploy to Vercel (production)
+    needs: [verify, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Check Vercel credentials
+        id: creds
+        run: |
+          if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Deploy skipped::Add the VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID repository secrets to enable deploys."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.creds.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v7
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          node-version: 22
+
+      # Built remotely on Vercel rather than with --prebuilt: Prisma's query
+      # engine must match Vercel's runtime OS, and `vercel-build` needs the
+      # project's production env (Postgres DATABASE_URL, SESSION_SECRET, …).
+      - name: Deploy
+        id: deploy
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          url=$(npx --yes vercel@62.5.0 deploy --prod --yes --token "$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployed to $url" >> "$GITHUB_STEP_SUMMARY"

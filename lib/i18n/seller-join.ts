@@ -1,0 +1,131 @@
+// The seller sign-up screens in Kannada and Hindi, keyed by their English
+// text, so the wizard reads `tx("Who are you selling as?")` and still shows
+// English when no translation is needed. Choice labels live with the voice
+// guide's script (lib/assistant/signup-script.ts).
+import type { AssistantLang } from "@/lib/assistant/intents";
+
+const T: Record<string, { kn: string; hi: string }> = {
+  "About you": { kn: "ನಿಮ್ಮ ಬಗ್ಗೆ", hi: "आपके बारे में" },
+  "Your produce": { kn: "ನಿಮ್ಮ ಬೆಳೆ", hi: "आपकी उपज" },
+  "Your buyers": { kn: "ಖರೀದಿದಾರರು", hi: "आपके खरीदार" },
+  Delivery: { kn: "ಡೆಲಿವರಿ", hi: "डिलीवरी" },
+  "Pricing & payment": { kn: "ಬೆಲೆ ಮತ್ತು ಪಾವತಿ", hi: "दाम और भुगतान" },
+  "Verify & finish": { kn: "ಖಚಿತಪಡಿಸಿ, ಮುಗಿಸಿ", hi: "पुष्टि करें और पूरा करें" },
+  Step: { kn: "ಹಂತ", hi: "कदम" },
+  of: { kn: "/", hi: "/" },
+  "You have a setup in progress on this device.": { kn: "ಈ ಸಾಧನದಲ್ಲಿ ಅರ್ಧ ಮುಗಿದ ನೋಂದಣಿ ಇದೆ.", hi: "इस डिवाइस पर अधूरा साइन-अप है।" },
+  "Continue where I left off": { kn: "ಬಿಟ್ಟಲ್ಲಿಂದ ಮುಂದುವರಿಸಿ", hi: "जहाँ छोड़ा था, वहीं से" },
+  "Start over": { kn: "ಮೊದಲಿನಿಂದ", hi: "फिर से शुरू करें" },
+
+  "Who are you selling as?": { kn: "ನೀವು ಯಾರಾಗಿ ಮಾರುತ್ತಿದ್ದೀರಿ?", hi: "आप किस रूप में बेच रहे हैं?" },
+  "Farm or business name": { kn: "ತೋಟ ಅಥವಾ ವ್ಯಾಪಾರದ ಹೆಸರು", hi: "खेत या व्यवसाय का नाम" },
+  "Contact person": { kn: "ಸಂಪರ್ಕ ವ್ಯಕ್ತಿ", hi: "संपर्क व्यक्ति" },
+  "Mobile number": { kn: "ಮೊಬೈಲ್ ನಂಬರ್", hi: "मोबाइल नंबर" },
+  "Preferred language": { kn: "ಆದ್ಯತೆಯ ಭಾಷೆ", hi: "पसंदीदा भाषा" },
+  State: { kn: "ರಾಜ್ಯ", hi: "राज्य" },
+  District: { kn: "ಜಿಲ್ಲೆ", hi: "ज़िला" },
+  "Town or village": { kn: "ಊರು", hi: "गाँव या कस्बा" },
+  "PIN code": { kn: "ಪಿನ್ ಕೋಡ್", hi: "पिन कोड" },
+  "Farm, shop or collection-centre address": { kn: "ತೋಟ, ಅಂಗಡಿ ಅಥವಾ ಸಂಗ್ರಹ ಕೇಂದ್ರದ ವಿಳಾಸ", hi: "खेत, दुकान या कलेक्शन सेंटर का पता" },
+  "Nearest FoodFlow service area": { kn: "ಹತ್ತಿರದ FoodFlow ಸೇವಾ ಪ್ರದೇಶ", hi: "सबसे पास का FoodFlow इलाक़ा" },
+  "How do you hold the land or source the produce?": { kn: "ಜಮೀನು ಹೇಗೆ ಹೊಂದಿದ್ದೀರಿ ಅಥವಾ ಬೆಳೆ ಎಲ್ಲಿಂದ ಪಡೆಯುತ್ತೀರಿ?", hi: "ज़मीन किसकी है, या उपज कहाँ से लाते हैं?" },
+
+  "What do you sell?": { kn: "ನೀವು ಏನು ಮಾರುತ್ತೀರಿ?", hi: "आप क्या बेचते हैं?" },
+  "Pick all that apply.": { kn: "ಅನ್ವಯಿಸುವ ಎಲ್ಲವನ್ನೂ ಆರಿಸಿ.", hi: "जो भी लागू हों, सब चुनें।" },
+  "Which of these crops do you grow or supply?": { kn: "ಇವುಗಳಲ್ಲಿ ಯಾವ ಬೆಳೆಗಳನ್ನು ಬೆಳೆಯುತ್ತೀರಿ ಅಥವಾ ಕೊಡುತ್ತೀರಿ?", hi: "इनमें से कौन सी फ़सलें उगाते या देते हैं?" },
+  "Optional. These appear first when you list a harvest.": { kn: "ಐಚ್ಛಿಕ. ಬೆಳೆ ಪಟ್ಟಿ ಮಾಡುವಾಗ ಇವು ಮೊದಲು ಕಾಣುತ್ತವೆ.", hi: "वैकल्पिक। फ़सल लिस्ट करते समय ये सबसे पहले दिखेंगी।" },
+  "Where does your produce come from?": { kn: "ನಿಮ್ಮ ಬೆಳೆ ಎಲ್ಲಿಂದ ಬರುತ್ತದೆ?", hi: "आपकी उपज कहाँ से आती है?" },
+  "How much can you typically supply?": { kn: "ಸಾಮಾನ್ಯವಾಗಿ ಎಷ್ಟು ಕೊಡಬಲ್ಲಿರಿ?", hi: "आम तौर पर कितना दे सकते हैं?" },
+  "A rough guide is enough. You'll enter exact quantities for each harvest.": { kn: "ಅಂದಾಜು ಸಾಕು. ಪ್ರತಿ ಬೆಳೆಗೆ ನಿಖರ ಪ್ರಮಾಣ ನಂತರ ಹಾಕುತ್ತೀರಿ.", hi: "अंदाज़ा काफ़ी है। हर फ़सल की सही मात्रा बाद में डालेंगे।" },
+  "How often is your produce available?": { kn: "ನಿಮ್ಮ ಬೆಳೆ ಎಷ್ಟು ಬಾರಿ ಲಭ್ಯ?", hi: "आपकी उपज कितनी बार मिलती है?" },
+  "What storage do you have?": { kn: "ನಿಮ್ಮ ಬಳಿ ಯಾವ ಸಂಗ್ರಹ ಸೌಲಭ್ಯ ಇದೆ?", hi: "आपके पास भंडारण की क्या सुविधा है?" },
+  "Optional.": { kn: "ಐಚ್ಛಿಕ.", hi: "वैकल्पिक।" },
+
+  "Who would you like to sell to?": { kn: "ಯಾರಿಗೆ ಮಾರಲು ಇಷ್ಟ?", hi: "आप किसे बेचना चाहेंगे?" },
+  "Select all that apply.": { kn: "ಅನ್ವಯಿಸುವ ಎಲ್ಲವನ್ನೂ ಆರಿಸಿ.", hi: "जो भी लागू हों, सब चुनें।" },
+  "What order sizes are you comfortable with?": { kn: "ಯಾವ ಗಾತ್ರದ ಆರ್ಡರ್ ನಿಮಗೆ ಸರಿ?", hi: "कितने बड़े ऑर्डर आपके लिए ठीक हैं?" },
+  "Who decides how your available stock is allocated?": { kn: "ನಿಮ್ಮ ಸ್ಟಾಕ್ ಯಾರಿಗೆ ಎಷ್ಟು ಎಂದು ಯಾರು ನಿರ್ಧರಿಸುತ್ತಾರೆ?", hi: "आपका स्टॉक किसे कितना मिले, यह कौन तय करेगा?" },
+  "Minimum order quantity in kg (optional)": { kn: "ಕನಿಷ್ಠ ಆರ್ಡರ್ ಪ್ರಮಾಣ, ಕಿಲೋದಲ್ಲಿ (ಐಚ್ಛಿಕ)", hi: "कम से कम ऑर्डर, किलो में (वैकल्पिक)" },
+  "I'm willing to negotiate prices with bulk buyers": { kn: "ದೊಡ್ಡ ಖರೀದಿದಾರರ ಜೊತೆ ಬೆಲೆ ಚೌಕಾಸಿಗೆ ಸಿದ್ಧ", hi: "थोक खरीदारों से मोलभाव के लिए तैयार हूँ" },
+  "I'd accept recurring orders or supply contracts": { kn: "ನಿಯಮಿತ ಆರ್ಡರ್ ಅಥವಾ ಪೂರೈಕೆ ಒಪ್ಪಂದ ಒಪ್ಪುತ್ತೇನೆ", hi: "नियमित ऑर्डर या सप्लाई अनुबंध लूँगा" },
+  "Contact me about unsold surplus if my produce isn't selling": { kn: "ಬೆಳೆ ಮಾರಾಟವಾಗದಿದ್ದರೆ ಹೆಚ್ಚುವರಿ ಬಗ್ಗೆ ನನಗೆ ತಿಳಿಸಿ", hi: "उपज न बिके तो बचे माल के बारे में मुझे बताएँ" },
+
+  "How can buyers receive the produce?": { kn: "ಖರೀದಿದಾರರು ಬೆಳೆಯನ್ನು ಹೇಗೆ ಪಡೆಯುತ್ತಾರೆ?", hi: "खरीदार उपज कैसे लेंगे?" },
+  "Do you already have a delivery person or vehicle?": { kn: "ನಿಮ್ಮ ಬಳಿ ಡೆಲಿವರಿ ವ್ಯಕ್ತಿ ಅಥವಾ ವಾಹನ ಇದೆಯೇ?", hi: "क्या आपके पास डिलीवरी वाला या गाड़ी है?" },
+  "How far can you serve?": { kn: "ಎಷ್ಟು ದೂರದವರೆಗೆ ಕೊಡಬಲ್ಲಿರಿ?", hi: "कितनी दूर तक दे सकते हैं?" },
+  "Who should pay the delivery fee?": { kn: "ಡೆಲಿವರಿ ಶುಲ್ಕ ಯಾರು ಕೊಡಬೇಕು?", hi: "डिलीवरी का पैसा कौन देगा?" },
+  "Who prepares and packs the order?": { kn: "ಆರ್ಡರ್ ಅನ್ನು ಯಾರು ಸಿದ್ಧಪಡಿಸಿ ಪ್ಯಾಕ್ ಮಾಡುತ್ತಾರೆ?", hi: "ऑर्डर कौन तैयार और पैक करेगा?" },
+  "How many hours' notice do you need to prepare an order?": { kn: "ಆರ್ಡರ್ ಸಿದ್ಧಪಡಿಸಲು ಎಷ್ಟು ಗಂಟೆ ಮುಂಚೆ ತಿಳಿಸಬೇಕು?", hi: "ऑर्डर तैयार करने के लिए कितने घंटे पहले बताना होगा?" },
+  "Delivery is only shown to buyers once a rider, a time slot and a fee are confirmed, so we never promise what can't be delivered.": {
+    kn: "ರೈಡರ್, ಸಮಯ ಮತ್ತು ಶುಲ್ಕ ಖಚಿತವಾದ ಮೇಲೆಯೇ ಖರೀದಿದಾರರಿಗೆ ಡೆಲಿವರಿ ಕಾಣುತ್ತದೆ, ಹಾಗಾಗಿ ಮಾಡಲಾಗದ ಭರವಸೆ ಕೊಡುವುದಿಲ್ಲ.",
+    hi: "राइडर, समय और शुल्क पक्का होने पर ही खरीदार को डिलीवरी दिखती है, ताकि ऐसा वादा न हो जो पूरा न हो सके।",
+  },
+
+  "How do you want to set prices?": { kn: "ಬೆಲೆ ಹೇಗೆ ನಿರ್ಧರಿಸಲು ಇಷ್ಟ?", hi: "दाम कैसे तय करना चाहेंगे?" },
+  "Price guidance is optional and never changes your price on its own.": { kn: "ಬೆಲೆ ಸಲಹೆ ಐಚ್ಛಿಕ, ಅದು ತಾನಾಗಿ ನಿಮ್ಮ ಬೆಲೆ ಬದಲಿಸುವುದಿಲ್ಲ.", hi: "दाम का सुझाव वैकल्पिक है, यह अपने आप आपका दाम नहीं बदलता।" },
+  "For bulk orders, are your prices…": { kn: "ದೊಡ್ಡ ಆರ್ಡರ್‌ಗಳಿಗೆ ನಿಮ್ಮ ಬೆಲೆ…", hi: "थोक ऑर्डर के लिए आपके दाम…" },
+  "Buyers can place advance orders before harvest": { kn: "ಕೊಯ್ಲಿಗೆ ಮುಂಚೆಯೇ ಖರೀದಿದಾರರು ಆರ್ಡರ್ ಮಾಡಬಹುದು", hi: "खरीदार कटाई से पहले ही ऑर्डर कर सकते हैं" },
+  "If a buyer asks for more than you have, what should happen?": { kn: "ನಿಮ್ಮ ಬಳಿ ಇರುವುದಕ್ಕಿಂತ ಹೆಚ್ಚು ಕೇಳಿದರೆ ಏನು ಮಾಡಬೇಕು?", hi: "अगर खरीदार आपके पास से ज़्यादा माँगे तो क्या करें?" },
+  "Which payment methods will you accept?": { kn: "ಯಾವ ರೀತಿಯಲ್ಲಿ ಹಣ ಸ್ವೀಕರಿಸುತ್ತೀರಿ?", hi: "भुगतान किन तरीक़ों से लेंगे?" },
+  "How would you like to receive your earnings?": { kn: "ನಿಮ್ಮ ಆದಾಯವನ್ನು ಹೇಗೆ ಪಡೆಯಲು ಇಷ್ಟ?", hi: "अपनी कमाई कैसे पाना चाहेंगे?" },
+  "We don't collect bank details here.": { kn: "ನಾವು ಇಲ್ಲಿ ಬ್ಯಾಂಕ್ ವಿವರ ಕೇಳುವುದಿಲ್ಲ.", hi: "हम यहाँ बैंक की जानकारी नहीं लेते।" },
+  "Payout details are set up separately, through a secure payment provider, when you're ready to be paid. We will never ask for your UPI PIN, bank password, card PIN or an OTP.": {
+    kn: "ಹಣ ಪಡೆಯಲು ಸಿದ್ಧವಾದಾಗ ಪಾವತಿ ವಿವರಗಳನ್ನು ಸುರಕ್ಷಿತ ಪಾವತಿ ಸೇವೆಯ ಮೂಲಕ ಬೇರೆಯಾಗಿ ಹೊಂದಿಸಲಾಗುತ್ತದೆ. ನಿಮ್ಮ ಯುಪಿಐ ಪಿನ್, ಬ್ಯಾಂಕ್ ಪಾಸ್‌ವರ್ಡ್, ಕಾರ್ಡ್ ಪಿನ್ ಅಥವಾ ಒಟಿಪಿ ಅನ್ನು ನಾವು ಎಂದಿಗೂ ಕೇಳುವುದಿಲ್ಲ.",
+    hi: "भुगतान की जानकारी अलग से, एक सुरक्षित पेमेंट सेवा के ज़रिए, तब ली जाती है जब आप पैसे पाने को तैयार हों। हम कभी आपका यूपीआई पिन, बैंक पासवर्ड, कार्ड पिन या ओटीपी नहीं माँगेंगे।",
+  },
+  "FoodFlow keeps a 5% platform fee on each sale. The delivery share is shown on every order, and you are paid after the handover is verified.": {
+    kn: "FoodFlow ಪ್ರತಿ ಮಾರಾಟದಲ್ಲಿ 5% ಶುಲ್ಕ ಇಟ್ಟುಕೊಳ್ಳುತ್ತದೆ. ಡೆಲಿವರಿ ಪಾಲು ಪ್ರತಿ ಆರ್ಡರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತದೆ, ಹಸ್ತಾಂತರ ಖಚಿತವಾದ ಮೇಲೆ ನಿಮಗೆ ಹಣ ಸಿಗುತ್ತದೆ.",
+    hi: "FoodFlow हर बिक्री पर 5% शुल्क रखता है। डिलीवरी का हिस्सा हर ऑर्डर पर दिखता है, और सामान सौंपने की पुष्टि के बाद आपको भुगतान मिलता है।",
+  },
+
+  "How are you registered?": { kn: "ನೀವು ಹೇಗೆ ನೋಂದಾಯಿಸಿಕೊಂಡಿದ್ದೀರಿ?", hi: "आप किस रूप में रजिस्टर्ड हैं?" },
+  "Choose one": { kn: "ಒಂದನ್ನು ಆರಿಸಿ", hi: "एक चुनें" },
+  "FSSAI registration / licence number (if you have one)": { kn: "FSSAI ನೋಂದಣಿ / ಪರವಾನಗಿ ಸಂಖ್ಯೆ (ಇದ್ದರೆ)", hi: "FSSAI पंजीकरण / लाइसेंस नंबर (अगर हो)" },
+  "Some food businesses need one. You can add it later.": { kn: "ಕೆಲವು ಆಹಾರ ವ್ಯಾಪಾರಗಳಿಗೆ ಬೇಕು. ನಂತರವೂ ಸೇರಿಸಬಹುದು.", hi: "कुछ खाद्य व्यवसायों के लिए ज़रूरी है। बाद में भी जोड़ सकते हैं।" },
+  "Expiry date (optional)": { kn: "ಮುಕ್ತಾಯ ದಿನಾಂಕ (ಐಚ್ಛಿಕ)", hi: "समाप्ति तिथि (वैकल्पिक)" },
+  "I'm authorised to list and sell this produce on behalf of this farm or organisation.": { kn: "ಈ ತೋಟ ಅಥವಾ ಸಂಸ್ಥೆಯ ಪರವಾಗಿ ಈ ಬೆಳೆಯನ್ನು ಪಟ್ಟಿ ಮಾಡಿ ಮಾರಲು ನನಗೆ ಅಧಿಕಾರ ಇದೆ.", hi: "मुझे इस खेत या संस्था की ओर से यह उपज लिस्ट करने और बेचने का अधिकार है।" },
+  "I'll keep quantities and availability accurate.": { kn: "ಪ್ರಮಾಣ ಮತ್ತು ಲಭ್ಯತೆಯನ್ನು ಸರಿಯಾಗಿ ಇಡುತ್ತೇನೆ.", hi: "मैं मात्रा और उपलब्धता सही रखूँगा।" },
+  "I agree to the": { kn: "ನಾನು ಒಪ್ಪುತ್ತೇನೆ:", hi: "मैं सहमत हूँ:" },
+  "seller terms": { kn: "ಮಾರಾಟಗಾರರ ನಿಯಮಗಳು", hi: "विक्रेता शर्तें" },
+  and: { kn: "ಮತ್ತು", hi: "और" },
+  "privacy policy": { kn: "ಗೌಪ್ಯತಾ ನೀತಿ", hi: "निजता नीति" },
+  "Create a PIN to finish": { kn: "ಮುಗಿಸಲು ಪಿನ್ ರಚಿಸಿ", hi: "पूरा करने के लिए पिन बनाएँ" },
+  "You'll use your mobile number and this PIN to sign in.": { kn: "ಸೈನ್ ಇನ್ ಮಾಡಲು ನಿಮ್ಮ ಮೊಬೈಲ್ ನಂಬರ್ ಮತ್ತು ಈ ಪಿನ್ ಬಳಸುತ್ತೀರಿ.", hi: "साइन इन के लिए आप अपना मोबाइल नंबर और यह पिन इस्तेमाल करेंगे।" },
+  "Every harvest you list is checked by a person before buyers see it. You can change your selling preferences, delivery and payout settings any time after you join.": {
+    kn: "ನೀವು ಪಟ್ಟಿ ಮಾಡುವ ಪ್ರತಿ ಬೆಳೆಯನ್ನು ಖರೀದಿದಾರರು ನೋಡುವ ಮೊದಲು ಒಬ್ಬ ವ್ಯಕ್ತಿ ಪರಿಶೀಲಿಸುತ್ತಾರೆ. ಸೇರಿದ ನಂತರ ಮಾರಾಟ, ಡೆಲಿವರಿ ಮತ್ತು ಪಾವತಿ ಆಯ್ಕೆಗಳನ್ನು ಯಾವಾಗ ಬೇಕಾದರೂ ಬದಲಿಸಬಹುದು.",
+    hi: "आपकी हर फ़सल खरीदारों को दिखने से पहले एक व्यक्ति जाँचता है। जुड़ने के बाद बिक्री, डिलीवरी और भुगतान की सेटिंग कभी भी बदल सकते हैं।",
+  },
+  Back: { kn: "ಹಿಂದೆ", hi: "पीछे" },
+  Next: { kn: "ಮುಂದೆ", hi: "आगे" },
+  "Create my seller account": { kn: "ಮಾರಾಟಗಾರರ ಖಾತೆ ತೆರೆಯಿರಿ", hi: "मेरा विक्रेता खाता बनाएँ" },
+  "Already selling with us?": { kn: "ಈಗಾಗಲೇ ನಮ್ಮ ಜೊತೆ ಮಾರುತ್ತಿದ್ದೀರಾ?", hi: "पहले से हमारे साथ बेच रहे हैं?" },
+  "Sign in": { kn: "ಸೈನ್ ಇನ್", hi: "साइन इन" },
+
+  // Reasons the Next button gives.
+  "Choose who you are selling as": { kn: "ನೀವು ಯಾರಾಗಿ ಮಾರುತ್ತಿದ್ದೀರಿ ಎಂದು ಆರಿಸಿ", hi: "चुनें कि आप किस रूप में बेच रहे हैं" },
+  "Enter your farm or business name": { kn: "ತೋಟ ಅಥವಾ ವ್ಯಾಪಾರದ ಹೆಸರು ಹಾಕಿ", hi: "खेत या व्यवसाय का नाम डालें" },
+  "Enter the contact person's name": { kn: "ಸಂಪರ್ಕ ವ್ಯಕ್ತಿಯ ಹೆಸರು ಹಾಕಿ", hi: "संपर्क व्यक्ति का नाम डालें" },
+  "Enter a 10-digit mobile number": { kn: "10 ಅಂಕಿಯ ಮೊಬೈಲ್ ನಂಬರ್ ಹಾಕಿ", hi: "10 अंकों का मोबाइल नंबर डालें" },
+  "Enter your district and town or village": { kn: "ಜಿಲ್ಲೆ ಮತ್ತು ಊರಿನ ಹೆಸರು ಹಾಕಿ", hi: "ज़िला और गाँव डालें" },
+  "Enter a 6-digit PIN code": { kn: "6 ಅಂಕಿಯ ಪಿನ್ ಕೋಡ್ ಹಾಕಿ", hi: "6 अंकों का पिन कोड डालें" },
+  "Enter the farm or collection-point address": { kn: "ತೋಟ ಅಥವಾ ಸಂಗ್ರಹ ಸ್ಥಳದ ವಿಳಾಸ ಹಾಕಿ", hi: "खेत या कलेक्शन पॉइंट का पता डालें" },
+  "Choose your nearest service area": { kn: "ಹತ್ತಿರದ ಸೇವಾ ಪ್ರದೇಶ ಆರಿಸಿ", hi: "सबसे पास का इलाक़ा चुनें" },
+  "Tell us how you hold the land or source the produce": { kn: "ಜಮೀನು ಹೇಗೆ ಹೊಂದಿದ್ದೀರಿ ಎಂದು ತಿಳಿಸಿ", hi: "बताएँ कि ज़मीन किसकी है या उपज कहाँ से आती है" },
+  "Pick at least one kind of produce": { kn: "ಕನಿಷ್ಠ ಒಂದು ಬಗೆಯ ಬೆಳೆ ಆರಿಸಿ", hi: "कम से कम एक तरह की उपज चुनें" },
+  "Choose your typical weekly supply": { kn: "ವಾರದ ಸಾಮಾನ್ಯ ಪೂರೈಕೆ ಆರಿಸಿ", hi: "हफ़्ते की आम सप्लाई चुनें" },
+  "Pick at least one kind of buyer": { kn: "ಕನಿಷ್ಠ ಒಂದು ಬಗೆಯ ಖರೀದಿದಾರರನ್ನು ಆರಿಸಿ", hi: "कम से कम एक तरह के खरीदार चुनें" },
+  "Choose the order sizes you are comfortable with": { kn: "ಸರಿಹೊಂದುವ ಆರ್ಡರ್ ಗಾತ್ರ ಆರಿಸಿ", hi: "ऑर्डर का आकार चुनें" },
+  "Choose how buyers can receive the produce": { kn: "ಖರೀದಿದಾರರು ಬೆಳೆ ಹೇಗೆ ಪಡೆಯುತ್ತಾರೆ ಎಂದು ಆರಿಸಿ", hi: "चुनें कि खरीदार उपज कैसे लेंगे" },
+  "Who pays the delivery fee?": { kn: "ಡೆಲಿವರಿ ಶುಲ್ಕ ಯಾರು ಕೊಡುತ್ತಾರೆ?", hi: "डिलीवरी का पैसा कौन देगा?" },
+  "Choose at least one way to be paid": { kn: "ಹಣ ಪಡೆಯುವ ಕನಿಷ್ಠ ಒಂದು ರೀತಿ ಆರಿಸಿ", hi: "भुगतान का कम से कम एक तरीका चुनें" },
+  "Choose how you are registered": { kn: "ನೀವು ಹೇಗೆ ನೋಂದಾಯಿಸಿಕೊಂಡಿದ್ದೀರಿ ಎಂದು ಆರಿಸಿ", hi: "चुनें कि आप कैसे रजिस्टर्ड हैं" },
+  "Please confirm you may sell this produce": { kn: "ಈ ಬೆಳೆ ಮಾರಲು ಅಧಿಕಾರ ಇದೆ ಎಂದು ಖಚಿತಪಡಿಸಿ", hi: "पुष्टि करें कि आप यह उपज बेच सकते हैं" },
+  "Please agree to keep availability accurate": { kn: "ಲಭ್ಯತೆಯನ್ನು ಸರಿಯಾಗಿ ಇಡುವುದಾಗಿ ಒಪ್ಪಿ", hi: "उपलब्धता सही रखने पर सहमति दें" },
+  "Please accept the seller terms and privacy policy": { kn: "ಮಾರಾಟಗಾರರ ನಿಯಮ ಮತ್ತು ಗೌಪ್ಯತಾ ನೀತಿ ಒಪ್ಪಿ", hi: "विक्रेता शर्तें और निजता नीति स्वीकार करें" },
+  "Create a 4–6 digit PIN": { kn: "4 ರಿಂದ 6 ಅಂಕಿಯ ಪಿನ್ ರಚಿಸಿ", hi: "4 से 6 अंकों का पिन बनाएँ" },
+};
+
+/** `text` in the sign-up page language (English when there's no translation). */
+export function joinText(text: string, lang: AssistantLang): string {
+  return lang === "en" ? text : (T[text]?.[lang] ?? text);
+}

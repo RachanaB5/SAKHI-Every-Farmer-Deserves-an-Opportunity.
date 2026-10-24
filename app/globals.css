@@ -1,0 +1,455 @@
+/*
+ * FoodFlow design tokens + global styles.
+ * Storybook palette, taken from the landing-page farm story: clean off-white
+ * paper, leaf-green ink, a fresh "grass" accent (the old lime slot), tomato
+ * red, teal and denim. Light/dark themes share token names so every
+ * component themes through CSS variables.
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--ff-sans);
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-heading: var(--ff-heading);
+  /* The "accent" words in headlines (see .font-serif below). */
+  --font-serif: var(--ff-accent);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Brand colours usable as Tailwind utilities: bg-lime, text-tomato… */
+  --color-lime: var(--lime);
+  --color-lime-foreground: var(--lime-foreground);
+  --color-tomato: var(--tomato);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-sky: var(--sky);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --animate-marquee: marquee var(--marquee-duration, 40s) linear infinite;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+  --animate-scan: scan 1.8s ease-in-out infinite;
+  --animate-roll: roll 2.4s ease-in-out infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 1.8s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+  --animate-spin-y: spin-y var(--spin-duration, 36s) linear infinite;
+  --animate-orb: orb 14s ease-in-out infinite;
+
+  @keyframes spin-y {
+    from {
+      transform: rotateX(var(--tilt, -8deg)) rotateY(0deg);
+    }
+    to {
+      transform: rotateX(var(--tilt, -8deg)) rotateY(-360deg);
+    }
+  }
+  @keyframes orb {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    33% {
+      transform: translate3d(8%, -6%, 0) scale(1.08);
+    }
+    66% {
+      transform: translate3d(-6%, 5%, 0) scale(0.95);
+    }
+  }
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes roll {
+    0%,
+    100% {
+      transform: translateX(0) rotate(0deg);
+    }
+    50% {
+      transform: translateX(8.5rem) rotate(300deg);
+    }
+  }
+  @keyframes scan {
+    0% {
+      top: 0%;
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      top: 100%;
+      opacity: 0;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(1.9);
+      opacity: 0;
+    }
+  }
+}
+
+:root {
+  /* Type: rounded in the app. The landing page swaps these back to Geist and Instrument Serif (.theme-classic). */
+  --ff-sans: var(--font-nunito), var(--font-deva), var(--font-knda), ui-sans-serif, system-ui, sans-serif;
+  --ff-heading: var(--font-fredoka), var(--font-deva), var(--font-knda), ui-sans-serif, sans-serif;
+  --ff-accent: var(--font-fredoka), var(--font-deva), var(--font-knda), ui-sans-serif, sans-serif;
+
+  --ink: oklch(0.33 0.045 152);
+  --paper: oklch(0.985 0.005 150);
+  --lime: oklch(0.77 0.165 128);
+  --lime-foreground: oklch(0.27 0.045 152);
+  --tomato: oklch(0.6 0.215 29);
+  --sky: oklch(0.88 0.06 232);
+  --success: oklch(0.6 0.14 145);
+  --warning: oklch(0.8 0.155 80);
+  --info: oklch(0.58 0.085 210);
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: oklch(0.998 0.002 150);
+  --card-foreground: var(--ink);
+  --popover: oklch(0.998 0.002 150);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: oklch(0.99 0.004 150);
+  --secondary: oklch(0.955 0.01 150);
+  --secondary-foreground: var(--ink);
+  --muted: oklch(0.958 0.01 150);
+  --muted-foreground: oklch(0.49 0.04 145);
+  --accent: oklch(0.94 0.05 140);
+  --accent-foreground: var(--ink);
+  --destructive: oklch(0.58 0.22 27);
+  --border: oklch(0.915 0.012 150);
+  --input: oklch(0.89 0.014 150);
+  --ring: oklch(0.72 0.165 128);
+  /* Categorical chart slots (fixed order): leaf, teal, tomato, denim, amber. Amber is
+     < 3:1 on paper, so charts using it carry direct labels / a data table. */
+  --chart-1: #4f8d34;
+  --chart-2: #3f8a99;
+  --chart-3: #e5372a;
+  --chart-4: #6f93bd;
+  --chart-5: #e39a1c;
+  --chart-grid: oklch(0.33 0.045 152 / 9%);
+  --radius: 1rem;
+  --sidebar: oklch(0.97 0.008 150);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--ink);
+  --sidebar-primary-foreground: var(--paper);
+  --sidebar-accent: oklch(0.95 0.01 150);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: oklch(0.915 0.012 150);
+  --sidebar-ring: oklch(0.72 0.165 128);
+  --grain-opacity: 0.03;
+}
+
+.dark {
+  --ink: oklch(0.25 0.035 150);
+  --paper: oklch(0.97 0.006 150);
+  --lime: oklch(0.8 0.165 128);
+  --lime-foreground: oklch(0.25 0.045 152);
+  --sky: oklch(0.34 0.05 225);
+
+  --background: oklch(0.25 0.035 150);
+  --foreground: oklch(0.97 0.006 150);
+  --card: oklch(0.3 0.036 150);
+  --card-foreground: oklch(0.97 0.006 150);
+  --popover: oklch(0.31 0.036 150);
+  --popover-foreground: oklch(0.97 0.006 150);
+  --primary: oklch(0.8 0.165 128);
+  --primary-foreground: oklch(0.25 0.045 152);
+  --secondary: oklch(0.34 0.038 150);
+  --secondary-foreground: oklch(0.97 0.006 150);
+  --muted: oklch(0.33 0.036 150);
+  --muted-foreground: oklch(0.77 0.02 150);
+  --accent: oklch(0.4 0.07 135);
+  --accent-foreground: oklch(0.97 0.006 150);
+  --destructive: oklch(0.7 0.19 25);
+  --border: oklch(1 0 0 / 11%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.8 0.165 128);
+  /* Same hues stepped for the dark surface. */
+  --chart-1: #7ab648;
+  --chart-2: #5fb0c0;
+  --chart-3: #ef6a58;
+  --chart-4: #94b4dc;
+  --chart-5: #f0b13a;
+  --chart-grid: oklch(1 0 0 / 9%);
+  --sidebar: oklch(0.27 0.035 150);
+  --sidebar-foreground: oklch(0.97 0.006 150);
+  --sidebar-primary: oklch(0.8 0.165 128);
+  --sidebar-primary-foreground: oklch(0.25 0.045 152);
+  --sidebar-accent: oklch(0.34 0.038 150);
+  --sidebar-accent-foreground: oklch(0.97 0.006 150);
+  --sidebar-border: oklch(1 0 0 / 11%);
+  --sidebar-ring: oklch(0.8 0.165 128);
+  --grain-opacity: 0.045;
+}
+
+/*
+ * The landing page keeps its original look: forest ink on a clean paper, the
+ * electric "harvest lime" accent, near-black forest panels, Geist type with
+ * the Instrument Serif italic accents. Everything else uses the storybook
+ * theme above. Applied by wrapping the page in `.theme-classic`.
+ */
+.theme-classic {
+  --ff-sans: var(--font-geist), var(--font-deva), var(--font-knda), ui-sans-serif, system-ui, sans-serif;
+  --ff-heading: var(--font-geist), var(--font-deva), var(--font-knda), ui-sans-serif, sans-serif;
+  --ff-accent: var(--font-instrument), ui-serif, Georgia, serif;
+
+  --ink: oklch(0.21 0.03 155);
+  --paper: oklch(0.985 0.004 140);
+  --lime: oklch(0.91 0.2 124);
+  --lime-foreground: oklch(0.21 0.03 155);
+  --tomato: oklch(0.66 0.2 33);
+  --success: oklch(0.62 0.15 150);
+  --warning: oklch(0.78 0.15 75);
+  --info: oklch(0.62 0.13 240);
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--ink);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: oklch(0.985 0.004 140);
+  --secondary: oklch(0.955 0.006 140);
+  --secondary-foreground: var(--ink);
+  --muted: oklch(0.955 0.005 140);
+  --muted-foreground: oklch(0.5 0.02 150);
+  --accent: oklch(0.95 0.06 124);
+  --accent-foreground: var(--ink);
+  --border: oklch(0.91 0.006 140);
+  --input: oklch(0.88 0.008 140);
+  --ring: oklch(0.72 0.17 124);
+  --radius: 0.75rem;
+  --grain-opacity: 0.035;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--ff-sans);
+}
+.dark .theme-classic,
+.theme-classic .dark {
+  --ink: oklch(0.16 0.018 155);
+  --paper: oklch(0.97 0.006 140);
+  --lime: oklch(0.9 0.21 124);
+  --lime-foreground: oklch(0.18 0.03 155);
+  --background: oklch(0.15 0.016 155);
+  --foreground: oklch(0.96 0.006 140);
+  --card: oklch(0.19 0.018 155);
+  --card-foreground: oklch(0.96 0.006 140);
+  --popover: oklch(0.2 0.018 155);
+  --popover-foreground: oklch(0.96 0.006 140);
+  --primary: oklch(0.9 0.21 124);
+  --primary-foreground: oklch(0.18 0.03 155);
+  --secondary: oklch(0.24 0.02 155);
+  --secondary-foreground: oklch(0.96 0.006 140);
+  --muted: oklch(0.23 0.018 155);
+  --muted-foreground: oklch(0.7 0.02 140);
+  --accent: oklch(0.3 0.06 130);
+  --accent-foreground: oklch(0.96 0.006 140);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.85 0.19 124);
+  --grain-opacity: 0.05;
+}
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-background text-foreground;
+    overflow-x: hidden;
+    /* A little morning sky behind every page, like the farm story. */
+    background-image: linear-gradient(to bottom, color-mix(in srgb, var(--sky) 55%, var(--background)) 0, var(--background) 440px);
+    background-repeat: no-repeat;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    /* --ff-heading (not --font-heading) so a wrapper such as .theme-classic can swap the face */
+    font-family: var(--ff-heading);
+  }
+  /* Headline accent words: the old italic serif becomes rounded, upright and tomato red. */
+  .font-serif.italic {
+    font-style: normal !important;
+  }
+  .font-serif.italic:not([class*="text-"]) {
+    color: var(--tomato);
+  }
+  /* Classic accents stay the original italic serif, in the surrounding colour. */
+  .theme-classic .font-serif.italic {
+    font-style: italic !important;
+  }
+  .theme-classic .font-serif.italic:not([class*="text-"]) {
+    color: inherit;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: var(--lime);
+    color: var(--lime-foreground);
+  }
+  /* Numbers line up in tables, counters and prices. */
+  .tabular,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Film-grain overlay that gives flat surfaces a subtle paper texture. */
+  .grain::after {
+    content: "";
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    opacity: var(--grain-opacity);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  .bg-dots {
+    background-image: radial-gradient(
+      color-mix(in oklch, var(--foreground) 14%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 18px 18px;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .glass {
+    background: color-mix(in oklch, var(--background) 72%, transparent);
+    backdrop-filter: saturate(160%) blur(18px);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      color-mix(in oklch, var(--muted) 55%, var(--background)) 50%,
+      var(--muted) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+
+  .text-outline {
+    -webkit-text-stroke: 1.5px currentColor;
+    color: transparent;
+  }
+
+  .mask-fade-x {
+    mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+  }
+
+  .mask-fade-b {
+    mask-image: linear-gradient(180deg, black 60%, transparent);
+  }
+
+  /* Space reserved under content for the fixed mobile tab bar. */
+  .pb-nav {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

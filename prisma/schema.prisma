@@ -1,0 +1,635 @@
+// FoodFlow data model — shared by all five interfaces (farmer, consumer,
+// bulk buyer, admin, delivery). Written to stay Postgres-compatible: no
+// SQLite-only types, money as Float rounded at the edges (lib/fees.ts),
+// lists stored as Json. `npm run db:postgres` swaps the provider for deploy.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────
+
+enum Role {
+  FARMER
+  CONSUMER
+  BULK_BUYER
+  ADMIN
+  DELIVERY
+}
+
+enum BatchStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  RESUBMIT
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum ListingStatus {
+  ACTIVE
+  PAUSED
+  SOLD_OUT
+}
+
+enum OrderType {
+  RETAIL
+  BULK
+}
+
+/// PLACED → CONFIRMED → PACKED → OUT_FOR_DELIVERY | READY_FOR_PICKUP →
+/// DELIVERED | COLLECTED, plus CANCELLED / DISPUTED. See lib/orders/state.ts.
+enum OrderStatus {
+  PLACED
+  CONFIRMED
+  PACKED
+  OUT_FOR_DELIVERY
+  READY_FOR_PICKUP
+  DELIVERED
+  COLLECTED
+  CANCELLED
+  DISPUTED
+}
+
+enum Fulfilment {
+  DELIVERY
+  PICKUP
+}
+
+enum PaymentStatus {
+  AUTHORISED
+  CAPTURED
+  REFUNDED
+  FAILED
+}
+
+enum SettlementStatus {
+  PENDING
+  SETTLED
+}
+
+enum DeliveryStatus {
+  UNASSIGNED
+  ASSIGNED
+  PICKED_UP
+  DELIVERED
+  FAILED
+}
+
+enum DemandStatus {
+  OPEN
+  AWARDED
+  CLOSED
+}
+
+enum OfferStatus {
+  PENDING
+  COUNTERED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+}
+
+// ─── People ───────────────────────────────────────────────────────────────
+
+model User {
+  id               String   @id @default(cuid())
+  name             String
+  phone            String   @unique
+  /// Set when the account was created with (or linked to) Google sign-in
+  email            String?  @unique
+  googleId         String?  @unique
+  /// scrypt hash of the 4–6 digit login PIN (lib/auth/password.ts)
+  pinHash          String
+  role             Role
+  /// UI language: en | hi | kn | ta | te
+  language         String   @default("en")
+  lat              Float?
+  lng              Float?
+  area             String?
+  address          String?
+  /// Bulk buyers only: organisation name and type (RESTAURANT | HOSTEL | COMMUNITY_KITCHEN)
+  orgName          String?
+  orgType          String?
+  /// 0–1, derived from fulfilment history; feeds offer ranking
+  reliabilityScore Float    @default(0.9)
+  /// Delivery workers: accepting new assignments
+  isAvailable      Boolean  @default(true)
+  suspended        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  farmerProfile FarmerProfile?
+  addresses     Address[]
+  onboarding    OnboardingProfile?
+  batches       Batch[]
+  listings      Listing[]
+  orders        Order[]         @relation("BuyerOrders")
+  farmerOrders  Order[]         @relation("FarmerOrders")
+  orderItems    OrderItem[]
+  settlements   Settlement[]
+  deliveries    Delivery[]      @relation("WorkerDeliveries")
+  demands       DemandRequest[]
+  offers        Offer[]
+  subscriptions Subscription[]
+  feedback      Feedback[]
+  auditLogs     AuditLog[]
+
+  @@index([role])
+}
+
+model FarmerProfile {
+  id       String  @id @default(cuid())
+  userId   String  @unique
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farmName String
+  village  String
+  /// string[] of crop slugs the farmer grows
+  crops    Json
+  bio      String?
+  upiId    String?
+  /// Sakhi: the one-time welcome has been shown
+  assistantWelcomeSeen Boolean @default(false)
+  /// Sakhi: speak the welcome / replies automatically
+  assistantAutoVoice   Boolean @default(true)
+}
+
+/// One row per confirmed Sakhi action, keyed by the confirm
+/// token's id — makes every confirmation single-use and idempotent.
+model AssistantAction {
+  jti       String   @id
+  userId    String
+  intent    String
+  /// Stored reply, returned again if the same token is confirmed twice
+  result    Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── Harvest verification ─────────────────────────────────────────────────
+
+model Batch {
+  id              String      @id @default(cuid())
+  farmerId        String
+  farmer          User        @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  crop            String
+  category        String
+  title           String?
+  quantityKg      Float
+  unit            String      @default("kg")
+  harvestDate     DateTime
+  declaredNotes   String?
+  /// Farmer's asking price per unit, carried onto the Listing at approval
+  proposedPrice   Float?
+  grade           String?
+  status          BatchStatus @default(PENDING_REVIEW)
+  aiQualityScore  Int?
+  /// string[] of visual flags (bruising, rot_spots, mould, mixed_sizes…)
+  aiFlags         Json?
+  aiSummary       String?
+  /// "ai" when a model produced the assessment, "fallback" for the deterministic mock
+  aiSource        String?
+  voiceTranscript String?
+  inputLanguage   String?
+  adminNote       String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  media   MediaAsset[]
+  listing Listing?
+
+  @@index([status])
+  @@index([farmerId])
+}
+
+model MediaAsset {
+  id                 String    @id @default(cuid())
+  batchId            String
+  batch              Batch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  url                String
+  type               MediaType
+  mimeType           String?
+  sizeBytes          Int?
+  /// SHA-256 of the raw file bytes, used for duplicate detection across batches
+  sha256             String
+  /// Same hash already seen on a different batch — a flag for admins, never proof
+  isDuplicate        Boolean   @default(false)
+  duplicateOfBatchId String?
+  /// Frames extracted client-side from a video are stored as IMAGE with isFrame
+  isFrame            Boolean   @default(false)
+  /// EXIF DateTimeOriginal when present
+  capturedAt         DateTime?
+  provenanceNote     String?
+  createdAt          DateTime  @default(now())
+
+  @@index([sha256])
+}
+
+// ─── Marketplace ──────────────────────────────────────────────────────────
+
+model Listing {
+  id             String        @id @default(cuid())
+  batchId        String        @unique
+  batch          Batch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  farmerId       String
+  farmer         User          @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  title          String
+  crop           String
+  category       String
+  unit           String
+  pricePerUnit   Float
+  suggestedPrice Float?
+  /// totalQty = availableQty + reservedQty + sold. Only confirmed orders move stock.
+  totalQty       Float
+  availableQty   Float
+  reservedQty    Float         @default(0)
+  minOrderQty    Float         @default(1)
+  status         ListingStatus @default(ACTIVE)
+  area           String
+  grade          String?
+  harvestDate    DateTime
+  imageUrl       String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  orderItems    OrderItem[]
+  offers        Offer[]
+  subscriptions Subscription[]
+
+  @@index([status, area])
+  @@index([crop])
+  @@index([farmerId])
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  /// Short human code shown on labels and typed by delivery workers (e.g. FF-7K2Q)
+  code           String      @unique
+  /// Orders created by one multi-farmer checkout share a groupId
+  groupId        String?
+  buyerId        String
+  buyer          User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  /// One order per farmer keeps delivery and settlement unambiguous
+  farmerId       String
+  farmer         User        @relation("FarmerOrders", fields: [farmerId], references: [id])
+  type           OrderType   @default(RETAIL)
+  status         OrderStatus @default(PLACED)
+  fulfilment     Fulfilment  @default(DELIVERY)
+  slot           String?
+  addressLine    String?
+  area           String
+  lat            Float?
+  lng            Float?
+  subtotal       Float
+  deliveryFee    Float
+  platformFee    Float
+  total          Float
+  notes          String?
+  /// Set when the order came from an accepted bulk offer
+  offerId        String?     @unique
+  /// Set when created by a recurring subscription run
+  subscriptionId String?
+  cancelReason   String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  items      OrderItem[]
+  payment    Payment?
+  settlement Settlement?
+  delivery   Delivery?
+  feedback   Feedback?
+  events     OrderEvent[]
+  offer      Offer?       @relation(fields: [offerId], references: [id])
+
+  @@index([buyerId])
+  @@index([farmerId])
+  @@index([status])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+  farmerId  String
+  farmer    User    @relation(fields: [farmerId], references: [id])
+  title     String
+  unit      String
+  qty       Float
+  unitPrice Float
+}
+
+/// Timeline entries for order tracking (one per status change).
+model OrderEvent {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  actorId   String?
+  createdAt DateTime    @default(now())
+
+  @@index([orderId])
+}
+
+/// Simulated payment. AUTHORISED at checkout, CAPTURED once stock is reserved.
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String        @unique
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status        PaymentStatus
+  amount        Float
+  method        String        @default("UPI (simulated)")
+  ref           String
+  authorisedAt  DateTime      @default(now())
+  capturedAt    DateTime?
+  refundedAt    DateTime?
+  failureReason String?
+}
+
+/// Farmer payout for one delivered order. Created PENDING on verified handover.
+model Settlement {
+  id           String           @id @default(cuid())
+  farmerId     String
+  farmer       User             @relation(fields: [farmerId], references: [id])
+  /// Unique: a second "delivered" call can never create a second payout
+  orderId      String           @unique
+  order        Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  gross        Float
+  platformFee  Float
+  deliveryCost Float
+  net          Float
+  status       SettlementStatus @default(PENDING)
+  settledAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@index([farmerId, status])
+}
+
+// ─── Fulfilment ───────────────────────────────────────────────────────────
+
+/// Handover record for both doorstep delivery and self-pickup. Holds the
+/// hashed OTP; plaintext is only ever returned to the recipient.
+model Delivery {
+  id               String         @id @default(cuid())
+  orderId          String         @unique
+  order            Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  mode             Fulfilment     @default(DELIVERY)
+  workerId         String?
+  worker           User?          @relation("WorkerDeliveries", fields: [workerId], references: [id])
+  status           DeliveryStatus @default(UNASSIGNED)
+  /// HMAC-SHA256(otp) keyed by SESSION_SECRET + delivery id
+  otpHash          String?
+  /// Rotates on every regeneration so older pickup QR codes stop working
+  otpNonce         String?
+  otpExpiresAt     DateTime?
+  otpAttempts      Int            @default(0)
+  otpRegenerations Int            @default(0)
+  distanceKm       Float?
+  /// Actual courier cost for this run; the farmer bears any part the buyer fee doesn't cover
+  cost             Float          @default(0)
+  failureReason    String?
+  assignedAt       DateTime?
+  pickedUpAt       DateTime?
+  verifiedAt       DateTime?
+  createdAt        DateTime       @default(now())
+
+  attempts DeliveryAttempt[]
+
+  @@index([workerId, status])
+}
+
+/// Every OTP / QR verification attempt — surfaced in admin delivery logs.
+model DeliveryAttempt {
+  id         String   @id @default(cuid())
+  deliveryId String
+  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  actorId    String?
+  method     String
+  success    Boolean
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([deliveryId])
+}
+
+// ─── Bulk procurement ─────────────────────────────────────────────────────
+
+model DemandRequest {
+  id          String       @id @default(cuid())
+  buyerId     String
+  buyer       User         @relation(fields: [buyerId], references: [id])
+  crop        String
+  qtyKg       Float
+  /// A | B | C | ANY
+  grade       String       @default("ANY")
+  targetPrice Float
+  deadline    DateTime
+  urgent      Boolean      @default(false)
+  recurring   Boolean      @default(false)
+  frequency   Frequency?
+  notes       String?
+  area        String
+  /// FORM | VOICE | LIST — how the requirement was captured
+  source      String       @default("FORM")
+  status      DemandStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+
+  offers Offer[]
+
+  @@index([status, crop])
+}
+
+model Offer {
+  id           String        @id @default(cuid())
+  demandId     String
+  demand       DemandRequest @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  farmerId     String
+  farmer       User          @relation(fields: [farmerId], references: [id])
+  /// Optional link to live stock (always set for surplus offers); reserved only on acceptance
+  listingId    String?
+  listing      Listing?      @relation(fields: [listingId], references: [id])
+  qtyKg        Float
+  pricePerKg   Float
+  etaHours     Int
+  note         String?
+  aiScore      Float?
+  aiRank       Int?
+  aiReason     String?
+  status       OfferStatus   @default(PENDING)
+  /// Latest counter price in a negotiation (max 2 rounds)
+  counterPrice Float?
+  rounds       Int           @default(0)
+  /// BUYER | FARMER — who made the last move
+  lastActor    String?
+  fromSurplus  Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  order Order?
+
+  @@index([demandId])
+  @@index([farmerId])
+}
+
+model Subscription {
+  id            String    @id @default(cuid())
+  buyerId       String
+  buyer         User      @relation(fields: [buyerId], references: [id])
+  listingId     String?
+  listing       Listing?  @relation(fields: [listingId], references: [id])
+  crop          String
+  qty           Float
+  unit          String
+  frequency     Frequency
+  /// 0 = Sunday … 6 = Saturday, weekly plans only
+  dayOfWeek     Int?
+  preferredSlot String
+  active        Boolean   @default(true)
+  nextRunAt     DateTime
+  lastRunAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([buyerId])
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User     @relation(fields: [buyerId], references: [id])
+  rating    Int
+  /// NONE | DAMAGED | NOT_FRESH | WRONG_ITEM | SHORT_QTY | LATE
+  issue     String?
+  comment   String?
+  photoUrl  String?
+  createdAt DateTime @default(now())
+}
+
+// ─── Platform ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}
+
+/// Mandi-style daily reference prices (₹/kg) used by the price advisor.
+model MarketPrice {
+  id         String   @id @default(cuid())
+  crop       String
+  area       String
+  modalPrice Float
+  minPrice   Float
+  maxPrice   Float
+  date       DateTime
+
+  @@unique([crop, area, date])
+  @@index([crop, date])
+}
+
+/// Pilot service areas. Checkout blocks addresses outside active areas.
+model ServiceArea {
+  id              String  @id @default(cuid())
+  name            String  @unique
+  lat             Float
+  lng             Float
+  radiusKm        Float
+  active          Boolean @default(true)
+  isPilot         Boolean @default(false)
+  baseDeliveryFee Float   @default(30)
+}
+
+/// Product categories. `special` categories (milk, eggs, chicken) need
+/// cold-chain handling and are only sold in areas listed in enabledAreas.
+model Category {
+  id           String  @id @default(cuid())
+  slug         String  @unique
+  name         String
+  special      Boolean @default(false)
+  /// string[] of ServiceArea names where this category may be sold
+  enabledAreas Json
+  sortOrder    Int     @default(0)
+}
+
+/// Key/value platform controls (commissionPct, surplus thresholds…).
+model PlatformSetting {
+  key   String @id
+  value String
+}
+
+// ─── Onboarding, addresses & contact ──────────────────────────────────────
+
+/// A saved delivery / pickup address. One of a user's addresses is "active":
+/// its values are copied onto User.area / address / lat / lng, which is what
+/// the rest of the app (nearest farms, delivery fees) reads.
+model Address {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Home | Work | Farm | Kitchen | Other | Current location
+  label             String
+  line              String
+  /// Nearest service area when the address is inside one
+  area              String?
+  lat               Float?
+  lng               Float?
+  /// Created from the browser's live location (replaced on the next detection)
+  isCurrentLocation Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// What a seller or restaurant told us while joining. `data` is the validated
+/// wizard answers (preferences only): confirmed orders, stock and payouts live
+/// in their own records. Bank details are never stored here.
+model OnboardingProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SELLER | RESTAURANT
+  kind      String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Messages from the landing page's "Connect with us" form.
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  topic     String
+  message   String
+  handled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([handled, createdAt])
+}
