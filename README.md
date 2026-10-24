@@ -1,115 +1,267 @@
-# FoodFlow — From Every Harvest to Every Table
+<div align="center">
+
+# 🌾 FoodFlow — From Every Harvest to Every Table
+
+**A farm-to-table marketplace where a farmer with a basic phone, in Kannada or Hindi, gets the same market as anyone else.**
+
+Farmers sell straight to households, restaurants and community kitchens. **Sakhi** (ಸಖಿ / सखी), the farmer's
+voice companion, takes them from sign-up to first sale by voice, and **phones them about every order**, so
+even a farmer without a smartphone never misses a sale.
 
 [![CI/CD](https://github.com/RachanaB5/SAKHI-Every-Farmer-Deserves-an-Opportunity./actions/workflows/ci.yml/badge.svg)](https://github.com/RachanaB5/SAKHI-Every-Farmer-Deserves-an-Opportunity./actions/workflows/ci.yml)
-
-**A fresh-produce marketplace that connects smallholder farmers directly with households, restaurants
-and community kitchens — with AI that assists and people who decide.** Farmers have **Sakhi** (ಸಖಿ / सखी),
-a voice companion that takes them from sign-up to their first listing in Kannada, Hindi or English.
+![Tests](https://img.shields.io/badge/tests-489%20passing-2ea44f)
+![SDG 10](https://img.shields.io/badge/SDG-10%20Reduced%20Inequalities-DD1367)
+![Languages](https://img.shields.io/badge/UI-English%20·%20हिन्दी%20·%20ಕನ್ನಡ-6f42c1)
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma)
+![Gemini](https://img.shields.io/badge/AI-Gemini-4285F4?logo=googlegemini&logoColor=white)
+![Twilio](https://img.shields.io/badge/Voice%20calls-Twilio-F22F46?logo=twilio&logoColor=white)
 
 ![FoodFlow landing page](docs/screenshots/landing.jpg)
 
+[Why](#-why-foodflow-exists) · [What](#-what-foodflow-does) · [SDG 10](#-built-for-sdg-10-reduced-inequalities) · [Sakhi](#-sakhi-a-voice-companion-in-the-farmers-language) · [Gram Panchayat partners](#-gram-panchayat-saathi-the-last-mile-is-a-person) · [Business model](#-business-model) · [Try it](#-try-it-in-two-minutes) · [Architecture](#-architecture) · [Tech stack](#-tech-stack) · [Roadmap](#-roadmap)
+
+</div>
+
 ---
 
-## The problem
+## ⚡ The 30-second pitch
 
-Smallholder farmers sell through long chains of middlemen, so they get a small share of what buyers
-pay — and perishable produce that doesn't sell in time is simply lost. Meanwhile households pay retail
-markups for produce that is days old, restaurants juggle unreliable suppliers, and community kitchens
-that feed people for free struggle to source affordably.
+| | |
+| --- | --- |
+| **Why** | Smallholder farmers earn a fraction of what buyers pay, lose produce that doesn't sell in time, and are shut out of digital markets by language, literacy and devices. |
+| **What** | One marketplace, five apps: farmers, households, restaurants & community kitchens, delivery riders and operations. Fair prices, verified quality, OTP-confirmed delivery, transparent payouts. |
+| **How** | Voice-first in Kannada, Hindi and English; an automated phone call for every order; AI that assists while people decide; and a trusted local partner in every Gram Panchayat who signs farmers up and earns for it. |
+| **Money** | A 5% commission withheld from the farmer's payout (admin-adjustable), delivery fees paid by buyers, and bulk procurement for restaurants. The farmer keeps at least 80% of the produce price, and usually 95%. |
+| **Impact** | Built for **SDG 10 — Reduced Inequalities**: income growth for the bottom earners (10.1) and economic inclusion regardless of language, literacy or device (10.2). |
 
-## What FoodFlow does
+---
 
-One marketplace, five apps — each built mobile-first at 360px and scaling up to a full desktop web app.
+## 🧭 Why FoodFlow exists
 
-| Interface | Who | Highlights |
+- **Farmers get a small share of the consumer rupee.** An RBI study (2024) found farmers receive roughly a
+  third of what consumers pay for tomatoes, onions and potatoes; the rest goes to the chain in between.
+- **Food is lost before it is sold.** NABCONS (2022) estimated India's post-harvest losses at about ₹1.5 lakh
+  crore a year. Perishables that don't sell in time simply rot.
+- **Most farmers are small.** About 86% of India's farmers are small or marginal (Agriculture Census 2015–16).
+  They can't negotiate with large buyers on their own.
+- **Digital markets assume English, literacy and a smartphone.** A farmer who speaks only Kannada, reads
+  little, or has a feature phone is left out of every app built that way.
+- **Buyers lose too.** Households pay retail markups for produce that is days old, restaurants juggle
+  unreliable suppliers, and community kitchens that feed people for free struggle to source affordably.
+
+**Who we build for** (all seeded in the demo):
+
+| Persona | Need | What FoodFlow gives them |
 | --- | --- | --- |
-| **Farmer** | Smallholders | List a harvest by **voice in Hindi, Kannada or English**; photo check by **Gemini** (is it really tomatoes? how fresh?) that says *not detectable* instead of guessing and never marks a farmer down for a blurry or dark phone photo; grades that then **follow customer reviews**, with an alert when buyers complain; indicative price advice from mandi data; orders, bulk offers, surplus rescue, traceable payouts. Whole UI in EN / हिन्दी / ಕನ್ನಡ. |
-| **Household** | Consumers | **Snap or type a grocery list → smart basket** across nearby farms; checkout with per-farm delivery; live tracking; OTP doorstep handover; **subscriptions** (milk every morning, vegetables every Sunday). |
-| **Restaurant / community kitchen** | Bulk buyers | Post urgent or recurring demand (form, voice or a procurement list); nearby farmers offer from live stock; **offers ranked** on cost, quantity, ETA, quality, distance and reliability; counter-offers; invoices. |
-| **Admin** | Operations | Human **verification queue** for every harvest (AI flags, duplicate-photo detection, EXIF capture time); disputes and refunds; trust & safety; platform controls; live analytics. |
-| **Delivery** | Riders | Runs, find order by code / QR / voice; a delivery is only complete when the **customer's OTP** is entered. |
+| **Ramesh Gowda**, tomato farmer, Doddaballapur | Sell 200 kg a week at a fair price; speaks Kannada | List by voice, a phone call for each order, payouts he can trace rupee by rupee |
+| **Ananya Rao**, household, Yelahanka | Fresh vegetables without the markup | Snap a grocery list → smart basket from nearby farms → doorstep delivery |
+| **The Green Ladle**, restaurant, Hebbal | 50 kg of onions by tomorrow, every week | Post a demand; nearby farmers offer; offers ranked and explained |
+| **Annapurna Community Kitchen** | Affordable bulk produce | Surplus rescue: produce at risk of waste offered at their target price |
+| **Gram Panchayat Saathi** (planned) | Local income, helping neighbours | Assisted farmer sign-up, with an incentive per active farmer |
 
-### A phone call for every order
+---
 
-Not every farmer has a smartphone. When an order is confirmed, Sakhi **rings the farmer** (Twilio Voice):
-*"Press 1 for Kannada, 2 for Hindi, 3 for English"*, then reads the order in that language: what was
-ordered and by whom, where it goes, which rider is coming and when, and to keep the pack ready. After
-that the farmer just talks: *"ಹೌದು"* / *"हाँ"* / *"yes"* (or pressing 1) books the rider through the same
-service as the orders board's button, questions (*"ಹಣ ಯಾವಾಗ ಸಿಗುತ್ತದೆ?"*) are answered by Gemini from
-that order's facts only, and *"no"* leaves the order unchanged and flags it for the team. The farmer's
-orders board has *Call me about this order* to hear it again. Switch it on with `VOICE_CALLS=on` (see
-[Configuration](#configuration)).
+## 🛒 What FoodFlow does
 
-### AI assists. People decide.
+One marketplace, five apps, each built mobile-first at **360 px** and scaling up to a full desktop web app.
+The whole site switches to **Kannada** automatically for visitors in Karnataka (to **Hindi** in Hindi-speaking
+states), with a language menu in every top bar.
 
-- **Visual checks, not certificates.** Quality scores describe what's visible in photos — never freshness or food safety.
-- **No guessing.** If the photos can't be graded (not produce, too unclear, a collage or stock picture, the wrong crop, or eggs/milk/chicken whose freshness doesn't show in a photo) the check says *not detectable* and why, instead of giving a score.
-- **Fair to cheap cameras.** Gemini is told to judge the produce, not the photography, and a blurry or dark photo never lowers a score; photo quality only changes how sure we are.
-- **Customers keep grades honest.** Photos set a listing's starting grade; buyer reviews move it after that, and bad reviews pull it down. One buyer can't change a grade alone, complaints with a photo Gemini can confirm count more, and the farmer is notified. A listing whose photos weren't graded gets its score from reviews alone.
-- **Prices are indicative.** Numbers come from mandi reference prices and comparable listings; the model only rewords the explanation. The farmer sets the price.
-- **People approve listings.** AI flags help the admin; a person decides what goes live.
-- **OTP or it didn't happen.** Only the customer's one-time code marks an order delivered and releases a payout.
-- **Works without a key.** Every AI feature except the photo check has a deterministic fallback (multilingual parsers, template text), labelled *Offline estimate* in the UI; without a key, photo checks say *not detectable* and an admin looks at the photos.
+| App | Who | Highlights |
+| --- | --- | --- |
+| 🧑‍🌾 **Farmer** | Smallholders | List a harvest **by voice**; a **Gemini photo check** (is it really tomatoes? how fresh?) that says *not detectable* instead of guessing and never marks down a cheap phone's photo; grades that **follow customer reviews**; indicative **mandi price advice**; orders, bulk offers, **surplus rescue**, traceable payouts; a **phone call for every order**. |
+| 🏠 **Household** | Consumers | **Snap or type a grocery list → smart basket** across nearby farms; per-farm delivery; live tracking; **OTP doorstep handover**; **subscriptions** (milk every morning, vegetables every Sunday). |
+| 🍽️ **Restaurant / community kitchen** | Bulk buyers | Post urgent or recurring demand by form, voice or a procurement list; nearby farmers offer from live stock; **offers ranked** on cost, quantity, ETA, quality, distance and reliability, with the reason; counter-offers; invoices. |
+| 🛡️ **Admin** | Operations | A **human verification queue** for every harvest (AI flags, duplicate-photo detection, EXIF capture time); disputes and refunds; trust & safety; platform controls; live analytics. |
+| 🛵 **Delivery** | Riders | Today's runs; find an order by code, QR or voice; a delivery is complete **only when the customer's OTP** is entered. |
 
-### Sakhi: ask by voice, in your language
+---
 
-A sprout button on every farmer screen opens **Sakhi** (ಸಖಿ / सखी), the farmer's voice companion: a side panel
-on desktop, a bottom sheet on phones. Farmers speak or type in Kannada, Hindi, English or a mix:
+## 🎯 Built for SDG 10: Reduced Inequalities
 
-- *"ಐವತ್ತು ಕಿಲೋ ಟೊಮೇಟೊ, ಕಿಲೋಗೆ ಇಪ್ಪತ್ತೈದು ರೂಪಾಯಿ"* → a harvest draft card, ready for a photo and review
-- *"इस हफ्ते मैंने कितना कमाया?"* → confirmed order value, fee, estimated net, and what is paid vs. still pending
+Digital commerce widens inequality when it only works for people who read English and own smartphones.
+Each FoodFlow feature removes one of those barriers:
+
+| Barrier | What FoodFlow does | SDG target |
+| --- | --- | --- |
+| **No smartphone** | An automated **phone call for every order** on any phone; the farmer answers by speaking or pressing a key | 10.2 |
+| **Language** | Every screen in English, हिन्दी and ಕನ್ನಡ, switched automatically by location; Sakhi speaks and understands all three, including mixed speech | 10.2 |
+| **Literacy** | Sign-up, listing a harvest and checking earnings **by voice**; Sakhi reads every question aloud and fills the form | 10.2 |
+| **Cheap cameras** | Photo checks judge the produce, not the photography; a blurry or dark photo never lowers a score | 10.3 |
+| **Middlemen's margin** | Direct sales: the farmer keeps 80–95% of the produce price, against roughly a third through traditional chains | 10.1 |
+| **Unsold produce** | Surplus rescue offers at-risk lots to community kitchens, never below 70% of the mandi rate | 10.1 |
+| **Trust gap with big buyers** | Restaurants rank offers on reliability and verified quality, so a small farmer competes on merit | 10.3 |
+| **Opaque payments** | Every order shows value, commission and net payout; payouts release only after an OTP-confirmed handover | 10.3 |
+| **No one to ask** | A Gram Panchayat Saathi (planned) helps farmers sign up and earns for it | 10.2 |
+
+*10.1: income growth of the bottom 40% · 10.2: social and economic inclusion of all · 10.3: equal opportunity and reduced inequality of outcome.*
+
+---
+
+## 🗣️ Sakhi: a voice companion in the farmer's language
+
+A sprout button on every farmer screen opens Sakhi. Farmers speak or type in Kannada, Hindi, English or a mix:
+
+- *"ಐವತ್ತು ಕಿಲೋ ಟೊಮೇಟೊ, ಕಿಲೋಗೆ ಇಪ್ಪತ್ತೈದು ರೂಪಾಯಿ"* → a harvest draft, ready for a photo and review
+- *"इस हफ्ते मैंने कितना कमाया?"* → order value, fee, estimated net, and what's paid vs. pending
 - *"tomato price 32 karo"*, *"show restaurant orders"*, *"book delivery for FF-ABC12"*, *"my payments"*
+
+**From sign-up to first listing, hands-free.** On seller sign-up Sakhi asks every question aloud and fills
+the form from the answers (*"ನನ್ನ ಹೆಸರು ರಮೇಶ್"*, *"ದೊಡ್ಡಬಳ್ಳಾಪುರ"*, *"UPI and cash"*); the PIN is typed,
+never spoken. Then, in the farmer app: the harvest, a photo, *"send it for review?"*, *"ಹೌದು"*.
 
 How it stays trustworthy:
 
-- **Rules first.** A parser for spoken numbers (*sava do sau*, *ಎರಡೂವರೆ ಸಾವಿರ*), units, crop names and
-  dates in all three languages handles most requests; the model is asked only when the rules are unsure,
-  returns a schema-checked intent, and never touches the database. Without a key it works the same.
-- **You see what was heard.** Speech becomes editable text first; low-confidence speech waits for *Use this*.
-- **Nothing changes without a tap.** Publishing, price, stock, offers and deliveries show a card; the
-  confirmation is signed, tied to the farmer, single-use and expires in five minutes. Publishing only sends
-  the harvest to the admin queue.
-- **Natural, honest voice.** Indian English first (names, places and crops pronounced the way farmers say
-  them), then the most natural voice on the device (Edge's *Natural* voices, Google and Apple enhanced
-  voices), in a female voice by default with a male one a tap away. Amounts are read the Indian way (*1 lakh 25 thousand*, *ಎರಡು ಸಾವಿರದ
-  ಐನೂರು*), order codes letter by letter, and replies sentence by sentence. Replies are fixed templates with
-  numbers from the database. Kannada is never read by an English voice: where a device has no Kannada voice
-  (desktop Chrome), a Hindi voice reads it from Devanagari letters, and the panel says so.
-- **A real Kannada voice.** Browsers rarely have one (desktop Chrome has none), so FoodFlow speaks Kannada
-  itself: SYSPIN's open Kannada female voice from IISc Bangalore (CC BY 4.0), converted to ONNX and run on
-  the server with onnxruntime-node (`/api/tts`). Names, *FoodFlow* and order codes inside Kannada lines are
-  written in Kannada letters first, so they are pronounced, not skipped. Sakhi's fixed lines are recorded
-  once and cached. Build it with `npm run voice:kannada` (see [Configuration](#configuration)); without
-  it, a Kannada voice on the device is used, or a Hindi voice reads the Kannada and the panel says so.
-- **A natural Hindi voice everywhere.** Many desktops only have a robotic Hindi voice, so FoodFlow can speak
-  Hindi itself too (SYSPIN's Hindi female voice, same licence, `npm run voice:hindi`), with numbers as Hindi
-  words (*दो हज़ार पाँच सौ*, *ढाई किलो*) and English words in Devanagari. A natural device voice (Edge's
-  Swara, Google हिन्दी) is still preferred when there is one. English picks the most natural voice on the
-  device, Indian English among equals.
-- **Numbers in any language mix.** Farmers often say numbers in English in the middle of Hindi or Kannada
-  (*"फिफ्टी किलो टमाटर, ट्वेंटी फाइव रुपये"*). The Hindi and Kannada recognisers write those in their own
-  script, and Sakhi reads them as numbers, including mobile numbers said digit by digit.
-- **Understands more than the options.** Shortcuts and slips pick the right answer (*"rest"*, *"resturant"*,
-  *"the 2nd one"*, *"ಸಣ್ಣ"*, *"gpay and cash"*), and many more ways of saying yes and no (*"ಆಯ್ತು"*,
-  *"हाँ जी"*, *"not now"*). Questions get answers instead of "I don't know": *"what is this app?"*,
-  *"ಇದು ಉಚಿತವಾ?"*, *"पैसे कब मिलेंगे?"*, *"why do you need my number?"*, *"what are the options?"*. During
-  sign-up Sakhi answers, then asks the pending question again, so a question is never saved as an answer.
-- **From sign-up to first listing, by voice.** On seller sign-up, Sakhi asks every question out loud
-  in Kannada, Hindi or English (the screens switch language too) and fills the form from the answers:
-  *"ನನ್ನ ಹೆಸರು ರಮೇಶ್"*, *"ದೊಡ್ಡಬಳ್ಳಾಪುರ"* (district, nearest service area and PIN code follow), *"ಟೊಮೇಟೊ
-  ಮತ್ತು ಈರುಳ್ಳಿ"*, *"about 200 kilo a week"*, *"UPI and cash"*. The PIN is typed, never spoken; a spoken
-  "yes" then creates the account. Sakhi carries straight on in the farmer app, hands-free: the
-  harvest, a photo, *"send it for review?"*, *"ಹೌದು"*. The first harvest is in the admin queue without the
-  farmer touching a form.
+- **Rules first, model second.** A parser for spoken numbers (*sava do sau*, *ಎರಡೂವರೆ ಸಾವಿರ*), units, crops
+  and dates in all three languages handles most requests; Gemini is asked only when the rules are unsure,
+  returns a schema-checked intent, and never touches the database.
+- **Nothing changes without a confirmation.** Publishing, prices, stock, offers and deliveries show a card first;
+  confirmations are signed, tied to the farmer, single-use and expire in five minutes.
+- **Understands people, not just options.** Shortcuts and slips (*"rest"*, *"the 2nd one"*, *"gpay and cash"*),
+  dozens of ways to say yes and no (*"ಆಯ್ತು"*, *"हाँ जी"*), and real answers to *"what is this app?"*,
+  *"ಇದು ಉಚಿತವಾ?"*, *"पैसे कब मिलेंगे?"*.
+- **A real Kannada and Hindi voice.** Most browsers have no Kannada voice, so FoodFlow speaks it itself:
+  SYSPIN's open voices from IISc Bangalore (CC BY 4.0), converted to ONNX and run on the server.
+  Amounts are read the Indian way (*1 lakh 25 thousand*, *ಎರಡು ಸಾವಿರದ ಐನೂರು*).
 
 What happens to voice and text: [docs/assistant-privacy.md](docs/assistant-privacy.md).
 
-## Screenshots
+### 📞 A phone call for every order
+
+When an order is confirmed, Sakhi rings the farmer:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant B as Buyer
+  participant FF as FoodFlow
+  participant T as Twilio Voice
+  participant F as Farmer (any phone)
+  participant G as Gemini
+  B->>FF: Places and pays for an order
+  FF->>T: Ring the farmer (after the response, checkout never waits)
+  T->>F: "Press 1 for Kannada, 2 for Hindi, 3 for English"
+  F->>T: 1
+  T->>F: "New order: 2 kg mangoes for Ananya, to Yelahanka. Imran reaches your farm in about 25 minutes. Keep the pack ready."
+  F->>T: "ಹಣ ಯಾವಾಗ ಸಿಗುತ್ತದೆ?" (When do I get paid?)
+  T->>FF: What the farmer said
+  FF->>G: The question plus this order's facts only
+  G-->>FF: Answer in Kannada
+  FF->>T: Spoken answer
+  F->>T: "ಹೌದು" (yes)
+  FF->>FF: Book the rider (the orders board's own service)
+  T->>F: "Done! Imran is on the way. Thank you."
+```
+
+- **Yes** (or pressing 1) books the rider; **no** leaves the order unchanged and flags it for the team; silence gets one gentle re-prompt.
+- Voices are Google WaveNet (Kannada, Hindi, Indian English). Gemini answers only from the order's facts, and Sakhi's FAQ answers when Gemini is unavailable.
+- Each call's webhook URL carries a per-order HMAC key. The farmer's board has **Call me about this order** to hear it again.
+
+### 🤖 AI assists. People decide.
+
+- **Visual checks, not certificates.** Scores describe what's visible in photos, never food safety.
+- **No guessing.** If photos can't be graded (not produce, unclear, a stock photo, the wrong crop, or eggs, milk or chicken), the result is *not detectable* with the reason.
+- **Customers keep grades honest.** Photos set the starting grade; buyer reviews move it after that, and one buyer alone can't change it.
+- **Prices are indicative.** Numbers come from mandi references and comparable listings; the model only rewords the explanation. The farmer sets the price.
+- **People approve listings.** AI flags help the admin; a person decides what goes live.
+- **OTP or it didn't happen.** Only the customer's one-time code marks an order delivered and releases a payout.
+- **Works without a key.** Every AI feature has a deterministic fallback, labelled *Offline estimate*.
+
+---
+
+## 🤝 Gram Panchayat Saathi: the last mile is a person
+
+> **Status: rollout model (planned).** The app already supports everything a Saathi needs to help a farmer
+> (voice-guided sign-up, voice listing, order calls). The partner dashboard and incentive ledger are on the
+> [roadmap](#-roadmap).
+
+Technology alone doesn't reach the last farmer; a trusted neighbour does. In every Gram Panchayat, FoodFlow
+appoints one **Saathi** (companion): a local person farmers already know. Good candidates are a self-help
+group member or Krishi Sakhi, a Common Service Centre operator, or a Panchayat volunteer.
+
+**What a Saathi does**
+
+| Responsibility | How |
+| --- | --- |
+| **Sign farmers up** | Sits with the farmer and completes sign-up with Sakhi in the farmer's language; the farmer's own mobile receives the verification code, so every account belongs to a real person |
+| **First listing** | Helps take the first harvest photos and send the batch for review |
+| **Village collection point** | Coordinates a pickup spot and time, so riders do one stop for several farms |
+| **Trust on the ground** | Confirms identity and farm location, and is the first contact for disputes |
+| **Training** | Shows farmers how to answer Sakhi's order calls and check their payouts |
+
+**How a Saathi earns** (proposed; paid out of FoodFlow's commission, never deducted from farmers):
+
+| Incentive | Amount | Paid when |
+| --- | --- | --- |
+| **Activation bonus** | ₹100 per farmer | That farmer completes **3 OTP-verified deliveries** (no payment for empty sign-ups) |
+| **Revenue share** | **1 percentage point** of FoodFlow's 5% commission on those farmers' sales | For the first 12 months |
+| **Quality bonus** | ₹500 a month | The Saathi's farmers keep complaint rates below the platform average |
+
+*Example: a Saathi with 40 active farmers each selling ₹15,000 a month generates ₹6 lakh in sales, so ₹6,000
+a month in revenue share, a meaningful income in a village, earned by helping neighbours sell.*
+
+**Safeguards.** Incentives are paid only on OTP-verified deliveries to independent buyers. The existing trust
+engine (duplicate photos, complaint rates, price outliers) also covers a Saathi's farmers. Every account is
+tied to a verified mobile number, and payouts are audit-logged.
+
+```mermaid
+flowchart LR
+  S[Gram Panchayat Saathi] -- "voice-guided sign-up" --> F[Farmer]
+  F -- "harvest by voice + photo" --> A[Admin review]
+  A -- approved --> L[Live listing]
+  L -- "order" --> C[📞 Order call to farmer]
+  C -- "OTP-verified delivery" --> P[Farmer payout]
+  P -- "1% revenue share + activation bonus" --> S
+```
+
+---
+
+## 💰 Business model
+
+**Revenue streams**
+
+| Stream | How it works | Status |
+| --- | --- | --- |
+| **Commission** | 5% of the produce value, withheld from the farmer's payout (admin-adjustable in Controls) | ✅ Live |
+| **Delivery fee** | Buyers pay a per-area delivery fee; retail delivery is free from ₹499. Courier cost is ₹15 + ₹1.5/km, capped at ₹60 | ✅ Live |
+| **Bulk procurement** | Restaurants and kitchens buy through ranked offers; the same commission applies | ✅ Live |
+| **Subscriptions** | Recurring household orders (milk daily, vegetables weekly) for predictable volume | ✅ Live (payments simulated; UPI AutoPay planned) |
+| **Restaurant Pro** | Recurring schedules, invoices and procurement analytics as a paid tier for kitchens | 🔜 Planned |
+| **Logistics partners** | Village collection points that batch pickups, cutting cost per kg | 🔜 Planned |
+
+**Where a ₹1,000 order's money goes**
+
+| | Amount |
+| --- | --- |
+| Produce value paid by the buyer | ₹1,000 |
+| FoodFlow commission (5%) | − ₹50 |
+| Farmer's share of delivery, if the buyer's fee doesn't cover the courier (capped at 15% of the order, usually ₹0) | − ₹0 to ₹150 |
+| **Farmer receives** | **₹800 to ₹950**, against roughly a third of the consumer price through a traditional chain |
+
+**Why buyers come:** fresher produce (harvest age is shown on every listing), lower prices than retail,
+verified quality with OTP-confirmed delivery, and for restaurants, competing offers ranked and explained.
+
+**Metrics we track** (live on the admin dashboard): GMV, orders, fulfilment rate, farmer earnings, kg sold,
+**kg rescued from waste**, and average buyer rating.
+
+**Go-to-market**
+
+1. **Pilot: Bengaluru.** Farms in Doddaballapur and Bengaluru Rural selling into Yelahanka, Hebbal and
+   Jayanagar households, restaurants and community kitchens (the seeded demo).
+2. **Saathi network.** Five Gram Panchayats around Doddaballapur, one Saathi each, onboarding farmers in person.
+3. **Scale out.** Farmer producer organisations (FPOs) bring members in bulk. Hindi is already built, so
+   Hindi-speaking states follow, with more languages after that.
+
+---
+
+## 📸 Screenshots
 
 | | |
 | --- | --- |
 | ![Admin harvest review with duplicate-photo flag](docs/screenshots/admin-review.jpg) | ![Bulk demand with AI-ranked offers](docs/screenshots/bulk-ranked-offers.jpg) |
-| Admin review — a re-used photo is flagged; the admin decides | Bulk demand — offers ranked with the reason and every factor |
+| Admin review: a re-used photo is flagged; the admin decides | Bulk demand: offers ranked with the reason and every factor |
 | ![Admin analytics overview](docs/screenshots/admin-overview.jpg) | ![Landing page in dark mode](docs/screenshots/landing-dark.jpg) |
 | Live marketplace analytics | Dark mode |
 
@@ -120,11 +272,14 @@ What happens to voice and text: [docs/assistant-privacy.md](docs/assistant-priva
   <img src="docs/screenshots/rider-handover.jpg" alt="Rider run screen" width="200" />
 </p>
 
-*Sakhi drafting a harvest from a Kannada sentence · farmer home in Kannada · a typed grocery list turned into a smart basket · the rider's run screen.*
+*Sakhi drafting a harvest from a Kannada sentence · farmer home in Kannada · a grocery list turned into a smart basket · the rider's run screen.*
 
-## Try it in two minutes
+---
 
-Requires **Node.js 20.9+**.
+## 🚀 Try it in two minutes
+
+**You need:** Node.js **20.9+**. Everything else is optional: a Gemini key, Twilio, Razorpay test keys, Firebase,
+and Python 3.10+ (only to build the server-side Kannada/Hindi voices, see [`requirements.txt`](requirements.txt)).
 
 ```bash
 git clone https://github.com/RachanaB5/SAKHI-Every-Farmer-Deserves-an-Opportunity..git foodflow
@@ -134,68 +289,55 @@ npm run setup   # creates .env, builds the SQLite database, seeds the Bengaluru 
 npm run dev
 ```
 
-Open **http://localhost:3000** and press **Get started**: choose **Buyer** (household or restaurant) or
-**Seller** and follow the sign-up. The seeded sample accounts below can sign in at `/login` (choose
-"I already have an account") with their mobile number and PIN **1234**:
+Open **http://localhost:3000** and press **Get started**, or sign in at `/login` → *I already have an account*
+with a seeded number and PIN **1234**:
 
 | Role | Phone | Persona |
 | --- | --- | --- |
-| Farmer | 9000000101 | Ramesh Gowda — Doddaballapur |
-| Household | 9000000201 | Ananya Rao — Yelahanka |
-| Restaurant | 9000000301 | The Green Ladle — Hebbal |
+| Farmer | 9000000101 | Ramesh Gowda, Doddaballapur |
+| Household | 9000000201 | Ananya Rao, Yelahanka |
+| Restaurant | 9000000301 | The Green Ladle, Hebbal |
 | Community kitchen | 9000000303 | Annapurna Community Kitchen |
 | Admin | 9000000001 | Meera Krishnan |
 | Delivery | 9000000401 | Imran Pasha |
 
-**Sign in with Google** needs your own OAuth client: set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`
-and add `<NEXT_PUBLIC_APP_URL>/api/auth/google/callback` as an authorised redirect URI (see `.env.example`).
-Members whose account has the same email, or who joined with Google, are signed straight in; new people choose
-Buyer or Seller, add a mobile number and finish.
-
-Your location in the top bar follows your device (the browser asks first) and each account can save several
-addresses. Messages from the home page's contact form are stored in the `ContactMessage` table.
-
-To start over with fresh sample data at any time: `npm run db:reset`.
-
-**Pay with Razorpay** (optional, free in Test Mode): sign up at [razorpay.com](https://razorpay.com), switch the
-dashboard to **Test Mode**, open *Account & Settings → API Keys → Generate Test Key*, put the two values in `.env`
-as `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`, and restart `npm run dev`. Checkout then opens Razorpay's own
-payment window; pay with UPI ID `success@razorpay` or card `4100 2800 0000 1007` (any future expiry, any CVV).
-Test Mode moves no real money. Without keys, checkout keeps its clearly labelled simulated payment. See
-[Payments](#payments-razorpay).
+Start over with fresh sample data any time: `npm run db:reset`.
 
 ### Demo script
 
-1. **Farmer** (Ramesh) → *New harvest* → pick the crop, quantity and harvest day → add photos → see the visual score and price advice → *Send for verification*. To list by voice instead, tap the sprout button and tell Sakhi *“50 kilo tamatar, aaj tode, 25 rupaye kilo”* (see step 8).
-2. **Admin** → *Review* → approve Ramesh's batch; open Ravi's tomato batch, see the duplicate-photo flag, and reject it.
-3. **Household** (Ananya) → *AI basket* → type or snap a grocery list → *Build my smart basket* → swap farms if you like → checkout with delivery. With Razorpay test keys set, *Pay* opens Razorpay: pay with `success@razorpay`, and the order page shows the Razorpay payment id; cancel the order and the refund id appears.
-4. **Farmer** → *Orders* → mark packed → *Book delivery*. **Delivery** (Imran) → open the run → *Picked up* → ask the household for the OTP (shown on their order page) → enter it → delivered. The farmer's *Payments* shows the settlement as pending.
-5. **Restaurant** (The Green Ladle) → *Post* an urgent 50 kg onion demand → as farmers, make two offers → back as the restaurant, the offers are ranked → accept one.
-6. **Farmer** → *Surplus* → a slow-selling spinach lot is flagged → offer it to Annapurna's open demand in one tap.
-7. **Admin** → *Overview* shows the new orders and kg rescued; *Trust* and *Controls* show flags, commission, service areas and payouts.
-8. **New farmer, by voice** → *Get started* → *Seller* → choose ಕನ್ನಡ → *Guide me by voice* → answer each question out loud (or type) and watch the form fill in → type a PIN → say *"ಹೌದು"* → in the farmer app say *"ಐವತ್ತು ಕಿಲೋ ಟೊಮೇಟೊ, ಕಿಲೋಗೆ ಇಪ್ಪತ್ತೈದು ರೂಪಾಯಿ"* → add a photo → *"ಹೌದು"*. As Ramesh, tap the sprout button and ask *"ಈ ವಾರ ಎಷ್ಟು ಗಳಿಸಿದೆ?"* or *"show restaurant orders"*.
+1. **Farmer** (Ramesh) → *New harvest* → crop, quantity, harvest day → photos → visual score and price advice → *Send for verification*. Or tap the sprout button and say *"50 kilo tamatar, aaj tode, 25 rupaye kilo"*.
+2. **Admin** → *Review* → approve Ramesh's batch; open Ravi's tomato batch, see the duplicate-photo flag, reject it.
+3. **Household** (Ananya) → *AI basket* → type or snap a grocery list → *Build my smart basket* → checkout. With Razorpay test keys, pay with UPI `success@razorpay`.
+4. **The farmer's phone rings** (with `VOICE_CALLS=on`): press 1, hear the order in Kannada, ask *"ಹಣ ಯಾವಾಗ ಸಿಗುತ್ತದೆ?"*, say *"ಹೌದು"* and the rider is booked.
+5. **Delivery** (Imran) → open the run → *Picked up* → enter the household's OTP → delivered. The farmer's *Payments* shows the settlement.
+6. **Restaurant** (The Green Ladle) → post an urgent 50 kg onion demand → farmers offer → offers are ranked → accept one.
+7. **Farmer** → *Surplus* → a slow-selling spinach lot is flagged → offer it to Annapurna in one tap.
+8. **New farmer, by voice** → *Get started* → *Seller* → ಕನ್ನಡ → *Guide me by voice* → answer aloud and watch the form fill in.
 
-Every step works at a 360px phone width and on desktop.
+Every step works at 360 px and on desktop.
 
-## Architecture
+---
+
+## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
-  subgraph Clients["Next.js App Router — five role apps"]
+  subgraph Clients["Next.js App Router: five role apps"]
     F[Farmer] & H[Household] & B[Bulk buyer] & A[Admin] & D[Delivery]
   end
-
+  PHONE[📞 Farmer's phone] <--> TW[Twilio Voice]
+  TW <-- "TwiML webhooks" --> API
   Clients -- "fetch / SWR" --> API["Route handlers /api/*<br/>auth · role · Zod · { ok, data | error }"]
-  Clients -. "SSE /api/events<br/>(5 s polling fallback)" .-> BUS[(Event bus)]
-
-  API --> DOMAIN["Domain logic (lib/)<br/>inventory · order state machine · OTP handover<br/>fees & settlement · offer ranking · smart basket<br/>surplus · subscriptions · trust signals"]
+  Clients -. "SSE /api/events<br/>(polling fallback)" .-> BUS[(Event bus)]
+  API --> DOMAIN["Domain logic (lib/)<br/>inventory · order state machine · OTP handover<br/>fees & settlement · offer ranking · smart basket<br/>surplus · subscriptions · trust · voice calls"]
   API --> AI["AI layer (lib/ai)<br/>withFallback()"]
   AI -- "key set" --> GEMINI[Gemini API]
-  AI -- "no key / timeout" --> FB[Deterministic fallbacks<br/>parsers · templates · photos "not detectable"]
+  AI -- "no key / timeout" --> FB[Deterministic fallbacks]
+  API --> TTS["Kannada / Hindi TTS<br/>ONNX on the server"]
   DOMAIN --> PRISMA[Prisma ORM]
   PRISMA --> DB[("SQLite (local)<br/>Postgres (deploy)")]
   DOMAIN -- publish --> BUS
-  API --> STORE["Media storage<br/>local disk · inline fallback"]
+  API --> PAY[Razorpay]
   CRON[Scheduler] -- "/api/subscriptions/run-due" --> API
 ```
 
@@ -222,186 +364,131 @@ stateDiagram-v2
 
 | Concern | Approach | Where |
 | --- | --- | --- |
-| **No double-selling** | Stock moves only through a conditional `UPDATE … WHERE availableQty >= qty` inside a transaction; a whole order reserves or nothing does. Cancel releases, handover commits. | `lib/inventory.ts` |
-| **Order states** | Explicit transition table; every move is a conditional update on the current status, so racing actions can't skip a step. | `lib/orders/state.ts` |
-| **Handover OTP** | Stored as HMAC(secret, delivery, nonce, code); 15-minute expiry; 5 attempts counted atomically; regenerating rotates the nonce and invalidates old pickup QRs. Handover is idempotent and creates exactly one settlement. | `lib/otp.ts`, `lib/delivery/handover.ts` |
-| **Who pays what** | Buyer pays subtotal + delivery fee (free retail delivery from ₹499). Commission (default 5%, admin-set) is withheld from the farmer. Courier cost is ₹15 + ₹1.5/km, capped at ₹60; the farmer covers any shortfall over the buyer's fee but never more than 15% of the order. | `lib/fees.ts` |
-| **Offer ranking** | Cost as a ratio to the cheapest delivered price, plus quantity, ETA, visual quality, distance and reliability (30/20/15/15/10/10); ×0.6 if it misses the deadline. The model may only explain, not reorder. | `lib/ranking.ts` |
-| **Smart basket** | Per item, scores nearby listings on price, ETA, freshness and visual quality, with a bonus for farms that cover several items (fewer deliveries). | `lib/basket.ts` |
-| **Surplus rescue** | At risk when sell-through is below the threshold after the minimum age, or the harvest has used most of its shelf life. Rescue offers go to open community-kitchen demand at the buyer's target, never below 70% of the mandi rate. | `lib/surplus.ts` |
-| **Payments** | Razorpay Checkout when keys are set: the server prices the cart and opens a Razorpay order; orders are created only after the payment's signature, order, amount and capture are confirmed with Razorpay. Verify and webhook race safely (one claims, the other reads). A farm that ran out after payment, a cancellation or a refunded dispute is refunded through Razorpay's API. | `lib/payments/` |
-| **Subscriptions** | IST slot scheduling; a run claims the plan with a conditional update so overlapping schedulers place one order; falls back to the same farmer, then any farm, when stock runs out. | `lib/subscriptions.ts` |
-| **Trust & safety** | SHA-256 duplicate-photo detection across batches, complaint-rate flags, price outliers vs. the mandi reference. Flags only — suspension and pausing are human actions, audit-logged. | `lib/trust.ts` |
-| **Photo check** | Gemini says what the photos show (the catalogue crops plus common produce we don't sell yet), whether that is the crop the farmer wrote, whether it is a mix or a stock photo / collage, and how fresh it visibly is (0–100). A score is given only when the photos clearly show the declared produce; otherwise the result is *not detectable* with the reason (and a one-tap crop fix on a mismatch). Blur, low light and over-exposure are measured locally and only set a confidence, never the score. When the main model is rate-limited a second model (own quota) answers. | `lib/ai/vision/`, `lib/ai/prompts.ts` |
-| **Phone verification** | Joining and "Forgot PIN?" text a 6-digit code (MSG91 or Twilio). Codes are stored only as an HMAC, expire in 10 minutes, allow 5 tries and one resend every 30 s; a correct code sets a signed 20-minute cookie that every sign-up route requires, so an account can only be created for a number its owner controls. The PIN is typed twice. | `lib/auth/phone-code.ts`, `lib/sms.ts` |
-| **Review-driven grades** | The photo score is a prior worth 2–8 reviews (more when the photos were clear). Each buyer's latest review of the item is blended in; a complaint whose photo the model confirms counts 1.5×, one it contradicts 0.5×. The grade only changes once two different buyers agree. Lateness and short weight don't count against produce quality. Complaints and grade changes notify the farmer. | `lib/quality/` |
+| **No double-selling** | Stock moves only through a conditional `UPDATE … WHERE availableQty >= qty` in a transaction; a whole order reserves or nothing does | `lib/inventory.ts` |
+| **Order states** | Explicit transition table; every move is a conditional update on the current status, so racing actions can't skip a step | `lib/orders/state.ts` |
+| **Handover OTP** | Stored as an HMAC; 15-minute expiry; 5 attempts counted atomically; handover is idempotent and creates exactly one settlement | `lib/otp.ts`, `lib/delivery/handover.ts` |
+| **Who pays what** | Buyer pays subtotal + delivery fee; commission (default 5%) is withheld from the farmer; the farmer covers any courier shortfall but never more than 15% of the order | `lib/fees.ts` |
+| **Offer ranking** | Cost, quantity, ETA, visual quality, distance and reliability (30/20/15/15/10/10); ×0.6 if it misses the deadline. The model may only explain, not reorder | `lib/ranking.ts` |
+| **Smart basket** | Scores nearby listings per item on price, ETA, freshness and quality, with a bonus for farms that cover several items | `lib/basket.ts` |
+| **Surplus rescue** | At risk when sell-through lags or shelf life runs out; rescue offers go to community kitchens, never below 70% of the mandi rate | `lib/surplus.ts` |
+| **Order phone calls** | Twilio dials out; each step's TwiML is built from the order; yes/no by rules, other questions by Gemini from the order's facts; per-order HMAC key on webhooks | `lib/voice-call/` |
+| **Language by location** | Reverse-geocoded state → Kannada for Karnataka, Hindi for Hindi states; a manual choice always wins; read on the server so pages render in the right language | `lib/geocode.ts`, `lib/i18n/` |
+| **Photo check** | Gemini says what the photos show, whether it matches the declared crop, and how fresh it looks; otherwise *not detectable* with the reason. Blur and light only set confidence | `lib/ai/vision/` |
+| **Review-driven grades** | The photo score is a prior worth 2–8 reviews; complaints with a confirming photo count 1.5×; grades change only once two buyers agree | `lib/quality/` |
+| **Payments** | Razorpay Checkout when keys are set; orders are created only after the signature, amount and capture are confirmed; refunds through Razorpay | `lib/payments/` |
+| **Phone verification** | Sign-up codes stored only as an HMAC, 10-minute expiry, 5 tries; every sign-up route requires a verified number | `lib/auth/phone-code.ts` |
+| **Trust & safety** | SHA-256 duplicate-photo detection, complaint-rate flags, price outliers; flags only, with humans acting and actions audit-logged | `lib/trust.ts` |
 
-### Payments (Razorpay)
+---
 
-| | With Razorpay keys | Without keys |
+## 🧰 Tech stack
+
+| Layer | Technology |
+| --- | --- |
+| **App** | Next.js 16 (App Router, Turbopack), React 19, TypeScript (strict) |
+| **UI** | Tailwind CSS 4, shadcn/ui, Framer Motion, React Three Fiber, Recharts |
+| **Data** | Prisma 6: SQLite locally, Postgres (Neon) in production; Zod validation |
+| **Auth** | Phone + PIN with SMS verification (MSG91 / Twilio), Google sign-in, Firebase Authentication; jose JWT sessions |
+| **AI** | Google Gemini (photo checks, intent fallback, call conversations), with deterministic fallbacks everywhere |
+| **Voice** | Browser speech recognition; SYSPIN Kannada/Hindi VITS voices on ONNX Runtime; Twilio Voice + Google WaveNet for phone calls |
+| **Payments** | Razorpay Checkout + REST API (no SDK), webhooks, refunds |
+| **Realtime** | Server-sent events with a polling fallback; SWR |
+| **Quality** | Vitest (489 tests), ESLint with zero warnings, Playwright responsive QA, GitHub Actions CI/CD |
+| **Hosting** | Vercel + Neon Postgres; Firestore (optional data copy) |
+
+---
+
+## ⚙️ Setup reference
+
+### What you need
+
+| | Required? | For |
 | --- | --- | --- |
-| Buyer checkout | Razorpay Checkout (UPI, cards, netbanking, wallets) | Simulated: authorise → reserve stock → capture, labelled *demo* |
-| When orders appear | Only after Razorpay confirms the payment | Immediately |
-| Cancellation, stock-out after payment, refunded dispute | Refunded through Razorpay; the refund id shows on the order | Marked refunded (simulated) |
-| Subscription runs and accepted bulk offers | Simulated (recurring mandates are not integrated) | Simulated |
-| Farmer payouts (settlements) | Recorded and released by admins; no money is sent out (RazorpayX payouts are not integrated) | Same |
+| Node.js 20.9+ | ✅ | Everything |
+| `DATABASE_URL`, `SESSION_SECRET` | ✅ | `npm run setup` writes both for local use |
+| `GEMINI_API_KEY` | Recommended | Photo checks, smarter parsing, order-call conversations ([get a key](https://aistudio.google.com/apikey)) |
+| Twilio account (`VOICE_CALLS=on`) | Optional | Order phone calls (a free trial works) |
+| `SMS_PROVIDER` | For launch | Sign-up codes by text; `console` shows them on screen for demos |
+| Razorpay test keys | Optional | Real checkout in Test Mode |
+| Firebase web settings | Optional | Google and email sign-in through Firebase |
+| Python 3.10+ (`pip install -r requirements.txt`) | Optional | Building the server-side Kannada/Hindi voices |
 
-The flow: `POST /api/payments/razorpay/order` prices the cart and stores it as a `PaymentIntent`.
-Razorpay Checkout opens in the browser, and `POST /api/payments/razorpay/verify` checks Razorpay's
-HMAC signature, fetches the payment from Razorpay (right order, full amount, captured, capturing it if it
-was only authorised) and places one order per farm. `POST /api/payments/razorpay/webhook` does the same
-for a buyer who closed the tab right after paying; set it up in the Razorpay dashboard with the events
-`payment.authorized`, `payment.captured`, `payment.failed` and `order.paid`, and put its secret in
-`RAZORPAY_WEBHOOK_SECRET` (Razorpay can't reach `localhost`, so use a tunnel or a deployed URL).
-Card and UPI details are typed into Razorpay's window; FoodFlow stores only Razorpay's order, payment and
-refund ids.
+Every variable, with what it does, is documented in [`.env.example`](.env.example).
 
-## Tech stack
-
-Next.js 16 (App Router, Turbopack) · React 19 · TypeScript (strict) · Tailwind CSS 4 · shadcn/ui ·
-Framer Motion · React Three Fiber · Recharts · Prisma 6 (SQLite locally, Postgres for deploy) · Zod ·
-jose (JWT sessions) · SWR · Zustand · sharp · Razorpay (Checkout + REST API, no SDK) · Vitest ·
-Playwright (responsive QA script) · Firebase Authentication · Firestore.
-
-## Scripts
+### Scripts
 
 | Command | What it does |
 | --- | --- |
-| `npm run setup` | First run: creates `.env` with a random secret, applies migrations, seeds demo data |
+| `npm run setup` | First run: creates `.env` with a random secret, applies migrations, seeds the demo |
 | `npm run dev` | Development server on http://localhost:3000 |
 | `npm run build` / `npm start` | Production build and server |
-| `npm test` | Vitest suite — inventory races, OTP rules, fee maths, ranking, subscriptions, parsers, Razorpay payments (against a stand-in API) |
+| `npm test` | Vitest: inventory races, OTP rules, fees, ranking, parsers, payments, voice calls, i18n |
 | `npm run lint` / `npm run typecheck` | ESLint (zero warnings) and TypeScript |
-| `npm run db:firestore:import` | Dry-run a copy of Prisma records into Firestore; add `-- --write` to import |
-| `npm run db:reset` | Recreate the database and reseed the demo |
-| `npm run db:studio` | Browse the data in Prisma Studio |
-| `npm run voice:hindi` | The same for SYSPIN's Hindi voice (`models/hi-female`) |
-| `npm run voice:kannada` | Download SYSPIN's open Kannada voice and convert it for the server (one time: a 333 MB download, 115 MB kept on disk) |
-| `node scripts/screenshots.mjs --role FARMER /farmer` | Screenshot pages at 360 / 768 / 1280 px and flag overflow and console errors |
+| `npm run db:reset` / `npm run db:studio` | Reseed the demo / browse the data |
+| `npm run voice:kannada` / `npm run voice:hindi` | Build Sakhi's server-side voices (one-time download) |
+| `npm run db:firestore:import` | Dry-run a copy of the data into Firestore; add `-- --write` to import |
 
-## Configuration
+### Deploy (Vercel + Postgres)
 
-Copy `.env.example` to `.env` (`npm run setup` does this for you).
+1. Import the repository at [vercel.com/new](https://vercel.com/new) and connect a **Neon** Postgres database (Storage tab).
+2. Set `SESSION_SECRET`, `NEXT_PUBLIC_APP_URL`, `SMS_PROVIDER`, and optionally `GEMINI_API_KEY`, the Twilio, Razorpay and Firebase keys.
+3. Deploy. `npm run vercel-build` switches Prisma to Postgres, pushes the schema and builds.
+4. Seed once: `npm run db:postgres && npx prisma db push && npm run db:seed` with `DATABASE_URL` pointing at Neon.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `DATABASE_URL` | yes | `file:./dev.db` locally; a Postgres URL in production |
-| `DIRECT_URL` | no | Direct (unpooled) Postgres URL for Neon / Supabase |
-| `SESSION_SECRET` | yes | 32+ random characters; signs sessions, pickup QRs and OTP hashes |
-| `GEMINI_API_KEY` | for photo checks | Enables Gemini: photo checks, and smarter parsing / explanations. Without it photo checks say *not detectable* (an admin reviews the photos) and other AI features use their fallbacks. The free tier allows only a few requests a minute; enable billing for real use |
-| `GEMINI_MODEL`, `AI_TIMEOUT_MS` | no | Model name and per-call timeout before falling back |
-| `GEMINI_FALLBACK_MODEL` | no | Answers when the main model is rate-limited or overloaded (default `gemini-3.1-flash-lite`; empty turns it off) |
-| `STORAGE_DRIVER` | no | `local` (default) writes uploads to `public/uploads`; falls back to inline on read-only hosts |
-| `CRON_SECRET` | no | Lets a scheduler call `/api/subscriptions/run-due` |
-| `NEXT_PUBLIC_STT_PROVIDER` | no | `browser` (default) uses the browser's speech recognition for Sakhi. `server` is reserved for a self-hosted Indic model and is not implemented yet |
-| `DEMO_MODE` | no | One-tap sign-in as seeded accounts (API only). Off in production unless set to `true`; keep it off on a live site |
-| `NEXT_PUBLIC_FIREBASE_*` | no | Firebase web app configuration for the modular client SDK |
-| `FIREBASE_PROJECT_ID` | no | Firebase project used by the Admin SDK and import script |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | no | Server-only service account JSON; alternatively configure Application Default Credentials |
-| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | no | Turn on Razorpay checkout and refunds. Test keys (`rzp_test_…`) are free and move no real money |
-| `RAZORPAY_WEBHOOK_SECRET` | no | Verifies `/api/payments/razorpay/webhook`, which places orders if a buyer closes the tab after paying |
-| `KANNADA_VOICE_DIR` | no | Where Sakhi's Kannada voice model lives (default `models/kn-female`, built by `npm run voice:kannada`, which needs Python with `torch`, `onnx` and `onnxruntime`). Without it Kannada uses the device's voices |
-| `HINDI_VOICE_DIR` | no | Where Sakhi's Hindi voice model lives (default `models/hi-female`, built by `npm run voice:hindi`). Without it Hindi uses the device's voices |
-| `SMS_PROVIDER` | for launch | How sign-up and "Forgot PIN?" codes are texted: `msg91` (India, DLT template with an `{otp}` variable; `MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID`) or `twilio` (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`). `console` shows the code on screen instead, for development and labelled demos only. Unset: development behaves like `console`, production refuses to send |
-| `VOICE_CALLS` | no | `on` rings the farmer about every confirmed order (Twilio Voice, Google WaveNet voices for Kannada, Hindi and English; replies understood by Gemini, Sakhi's FAQ without it). Needs `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, a voice-capable `TWILIO_FROM` (or `TWILIO_VOICE_FROM`) and a public https URL Twilio can reach: `VOICE_CALL_BASE_URL`, else `NEXT_PUBLIC_APP_URL`. On a Twilio trial account set `VOICE_CALL_TEST_NUMBER` to your verified phone and every call goes there |
-| `NEXT_PUBLIC_STT_PROVIDER` | no | `browser` (default) uses the browser's speech recognition for Sakhi. `server` is reserved for a self-hosted Indic model and is not implemented yet |
-| `DEMO_MODE` | no | One-tap sign-in as seeded accounts (API only). Off in production unless set to `true`; keep it off on a live site |
-| `DIRECT_URL` | no | Direct (unpooled) Postgres URL for Neon / Supabase |
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) lints, typechecks, tests, validates migrations
+and builds every pull request; pushes to `main` deploy to Vercel when the `VERCEL_*` secrets are set.
 
-### Firebase authentication and Firestore migration
-
-The sign-in page supports Firebase Google sign-in, email/password accounts and passwordless email
-links. New Firebase accounts continue through the existing role-specific onboarding and get a
-Firestore user profile plus an authentication link. Existing Prisma users can link their account
-when they sign in with the same verified email. Phone/PIN and the existing marketplace remain
-available during the data migration.
-
-In Firebase Console, enable Google, Email/Password and Email link sign-in, create a Firestore
-database, and copy the web app settings into the `NEXT_PUBLIC_FIREBASE_*` entries in `.env`. For
-server-side Firestore access, set
-`FIREBASE_PROJECT_ID` and configure a service account through `FIREBASE_SERVICE_ACCOUNT_JSON` or
-`GOOGLE_APPLICATION_CREDENTIALS`. Never expose service-account credentials to the browser.
-
-Firestore is configured for server-only access by default (`firestore.rules` denies client reads and
-writes). Deploy those rules before importing data. The import command is copy-only and leaves the
-SQLite/Postgres source unchanged. For a PostgreSQL source, first generate the Prisma client for
-PostgreSQL with the existing `npm run db:postgres` command and set `DATABASE_URL` to that database.
-
-```bash
-npm run db:firestore:import
-npm run db:firestore:import -- --write
-```
-
-The first command reports per-model record counts without writing. The second copies records to
-collections named after their Prisma models, preserving foreign keys as IDs. PIN hashes are never
-copied (a short PIN is easy to brute-force from its hash); Google IDs go to the server-only
-`authCredentials` collection instead of the `User` documents. You can rerun the importer safely to overwrite imported records, or limit it to
-one model with `-- --model=User --write`.
-
-This importer is a copy-only bridge; it does not cut marketplace reads/writes over from Prisma, nor
-does it convert PIN hashes into Firebase passwords. Firebase Auth profiles are linked as users sign
-in, while app data continues to use the source database. Keep the source database until every
-Firestore-backed data flow has been migrated and verified.
-
-## Deploy (Vercel + Postgres)
-
-1. Create a Postgres database (Neon, Supabase or Vercel Postgres).
-2. Import the repository in Vercel and set `DATABASE_URL` (and `DIRECT_URL` if your provider pools
-   connections), `SESSION_SECRET`, optionally `GEMINI_API_KEY` and `CRON_SECRET`, and an
-   `SMS_PROVIDER` with its keys so new members get their sign-up code by text. (Without one, sign-up
-   can't send codes in production; `SMS_PROVIDER=console` shows the code on screen for a demo site.)
-   For order phone calls also set `VOICE_CALLS=on`, the Twilio keys and `NEXT_PUBLIC_APP_URL` to the
-   deployed https URL (Twilio fetches the call script from it).
-3. Deploy. `vercel.json` runs `npm run vercel-build`, which switches the Prisma schema to Postgres,
-   pushes the schema and builds.
-4. Seed the demo once from your machine:
-
-   ```bash
-   export DATABASE_URL="postgresql://…"      # the same URL as on Vercel
-   npm run db:postgres && npx prisma db push && npm run db:seed
-   git checkout prisma/schema.prisma && unset DATABASE_URL && npx prisma generate   # back to SQLite
-   ```
-
-The included cron runs due subscriptions daily at 04:00 IST (the Hobby plan's limit); for
-15-minute runs, point any external scheduler at `/api/subscriptions/run-due` with
-`Authorization: Bearer $CRON_SECRET`. Live updates fall back to polling on serverless hosts, and
-uploaded media is stored inline when the filesystem is read-only.
-
-## Project structure
+### Project structure
 
 ```
-app/                 routes — one folder per role (farmer, shop, bulk, admin, delivery) + /api
-components/          UI by role, plus shell, motion, 3D (three/) and landing sections
-lib/                 domain logic, AI layer, auth, i18n (en / hi / kn), validators
-models/              Sakhi's Kannada / Hindi voices once built (not committed)
-prisma/              schema, migration and the deterministic demo seed
-scripts/             setup, Postgres switch, responsive screenshot QA
-tests/               Vitest suites (run against a throwaway SQLite database)
+app/          routes: one folder per role (farmer, shop, bulk, admin, delivery) + /api
+components/   UI by role, plus shell, motion, 3D and landing sections
+lib/          domain logic, AI layer, voice calls, auth, i18n (en / hi / kn), payments
+prisma/       schema, migrations and the deterministic demo seed
+scripts/      setup, Postgres switch, voice-model export, Firestore import, screenshot QA
+tests/        Vitest suites (run against a throwaway SQLite database)
+docs/         privacy notes and screenshots
 ```
 
-## CI/CD
+---
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull request and every push to
-`main`:
+## 🔒 Privacy & security
 
-- **Lint, types & tests** — ESLint, `tsc` (with Next route types), the Vitest suite, a check that
-  `prisma/migrations` matches `schema.prisma`, a fresh migrate + seed, and Postgres schema validation.
-- **Production build** — `npm run build`, with the Next.js build cache persisted between runs.
-- **Deploy** — pushes to `main` that pass both jobs are deployed to Vercel production (built on
-  Vercel via `npm run vercel-build`).
+- PINs are hashed; sign-up codes, handover OTPs and pickup QRs are HMAC-protected and expire.
+- Microphone and location are asked once, each with a one-line reason; location sets the language, nearby farms and the delivery area.
+- Sakhi uses the browser's own speech recognition; the order call sends Gemini only that one order's facts.
+- Firestore denies all client access; PIN hashes never leave the main database.
+- Every admin decision (approvals, suspensions, refunds, payouts) is audit-logged.
 
-To turn on deploys, add these repository secrets (**Settings → Secrets and variables → Actions**):
+Details: [docs/assistant-privacy.md](docs/assistant-privacy.md) and the in-app privacy page (`/privacy`).
 
-| Secret | Where to find it |
-| --- | --- |
-| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
-| `VERCEL_ORG_ID` | `orgId` in `.vercel/project.json` after running `npx vercel link` |
-| `VERCEL_PROJECT_ID` | `projectId` in the same file |
+---
 
-Without them, CI still runs and the deploy job is skipped. The app's runtime variables
-(`DATABASE_URL`, `DIRECT_URL`, `SESSION_SECRET`, `CRON_SECRET`, `GEMINI_API_KEY`) stay in the Vercel
-project settings. If the Vercel project is also connected to this repo through Vercel's Git
-integration, add `"git": { "deploymentEnabled": { "main": false } }` to `vercel.json` so `main`
-deploys only after CI passes. Without that, each push deploys twice.
+## 🗺️ Roadmap
 
-Build notes and decisions: [PROGRESS.md](PROGRESS.md).
+- [x] Five role apps, voice-first farmer flow, three languages, location-based language
+- [x] Order phone calls with language choice and Gemini conversation
+- [x] Review-driven quality grades, trust & safety, surplus rescue
+- [x] Razorpay checkout and refunds, OTP handover, settlements
+- [ ] **Gram Panchayat Saathi dashboard:** assisted sign-up mode, partner codes, incentive ledger
+- [ ] **Real payouts** through RazorpayX, and UPI AutoPay for subscriptions
+- [ ] **WhatsApp and SMS order updates** alongside the phone call
+- [ ] **Server-side Indic speech recognition** for low-end phones
+- [ ] **More languages:** Tamil and Telugu next
+- [ ] **Cold-chain partners** for milk, eggs and meat in more areas
+
+---
+
+## 👥 Team
+
+Built in 24 hours by [@skypank-coder](https://github.com/skypank-coder), [@RachanaB5](https://github.com/RachanaB5),
+[@Charis-E-Shiny](https://github.com/Charis-E-Shiny) and [@disnithaa](https://github.com/disnithaa).
+
+**Acknowledgements:** Kannada and Hindi voices from [SYSPIN](https://huggingface.co/SYSPIN) (IISc Bangalore,
+CC BY 4.0); produce photo credits in [public/seed/CREDITS.md](public/seed/CREDITS.md).
+
+<div align="center">
+
+**Every farmer deserves an opportunity. FoodFlow gives them one, in their own language, on any phone.**
+
+</div>
