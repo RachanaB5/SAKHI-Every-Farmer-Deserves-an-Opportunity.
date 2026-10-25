@@ -1,17 +1,15 @@
-// Farmer home: one calm photo grid of everything the farmer has added
-// (newest first) and a large + button to add more. Each card shows the crop,
-// how much, the price and where it stands — in the farmer's own language —
-// and can be deleted from the photo's corner.
+// Farmer home: one calm list of everything the farmer has added (newest
+// first) and a large + button to add more. Each row shows the crop, how
+// much, the price and where it stands — in the farmer's own language.
 "use client";
 
-import { AlertCircle, CheckCircle2, Clock, PackageCheck, Pause, PencilLine, Plus, Sprout, X, XCircle, type LucideIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronRight, Clock, PackageCheck, Pause, PencilLine, Plus, Sprout, X, XCircle, type LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import useSWR from "swr";
-import { ErrorState, SkeletonCards } from "@/components/common/states";
-import { CARD, CARD_GRID, CropPhoto, PHOTO_CHIP, PhotoDeleteButton, coverOf } from "@/components/farmer/crop-photo";
+import { MediaImage } from "@/components/common/media-image";
+import { ErrorState, SkeletonRows } from "@/components/common/states";
 import { statusText } from "@/components/farmer/farmer-status-badge";
-import { useRemoveHarvest } from "@/components/farmer/remove-harvest";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { useLive } from "@/hooks/use-live";
 import type { SerializedBatch } from "@/lib/batches";
@@ -57,12 +55,11 @@ export function FarmerHome({ query }: { query: string }) {
   const { t } = useI18n();
   const { data, error, isLoading, mutate } = useSWR<Row[]>("/api/batches");
   useLive(["batch.updated", "inventory.updated", "order.updated"], () => mutate());
-  const removal = useRemoveHarvest(() => mutate());
   const q = query.trim();
   const rows = data?.filter((b) => !q || matches(b, q, statusText(t, b.listing?.status ?? b.status))) ?? [];
 
   return (
-    <div>
+    <div className="mx-auto max-w-3xl">
       <header className="mb-5">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t("home.title")}</h1>
         <p className="mt-1 text-base text-muted-foreground">{t("home.subtitle")}</p>
@@ -77,52 +74,43 @@ export function FarmerHome({ query }: { query: string }) {
         </div>
       )}
 
-      {isLoading && <SkeletonCards count={8} className="grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" />}
+      {isLoading && <SkeletonRows count={4} />}
       {error && <ErrorState message={error.message} onRetry={() => mutate()} />}
       {data?.length === 0 && <EmptyHome />}
       {data && data.length > 0 && rows.length === 0 && (
         <p className="rounded-3xl border border-dashed p-8 text-center text-muted-foreground">{t("home.noResults", { q })}</p>
       )}
 
-      <ul className={CARD_GRID}>
+      <ul className="space-y-3">
         {rows.map((b, i) => (
-          <HarvestCard key={b.id} row={b} index={i} removeLabel={removal.label(b)} removing={removal.busyId === b.id} onRemove={() => removal.ask(b)} />
+          <HarvestRow key={b.id} row={b} index={i} />
         ))}
       </ul>
-      {removal.dialog}
 
       {data?.length !== 0 && <AddButton />}
     </div>
   );
 }
 
-function HarvestCard({ row, index, removeLabel, removing, onRemove }: { row: Row; index: number; removeLabel: string; removing: boolean; onRemove: () => void }) {
+function HarvestRow({ row, index }: { row: Row; index: number }) {
   const { t, lang } = useI18n();
   const status = row.listing?.status ?? row.status;
   const state = STATE[status] ?? STATE.DRAFT;
   const Icon = state.icon;
   const price = row.listing?.pricePerUnit ?? row.proposedPrice;
+  const thumb = row.media.find((m) => m.type === "IMAGE")?.url ?? (isCropSlug(row.crop) ? CROPS[row.crop].image : null);
   const action = row.status === "RESUBMIT" ? t("batches.fix") : row.status === "DRAFT" ? t("batches.continue") : null;
 
   return (
-    <motion.li
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index, 12) * 0.035, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      whileHover={{ y: -4 }}
-      className={CARD}
-    >
-      <Link href={hrefFor(row)} className="flex flex-1 flex-col active:scale-[0.99]">
-        <CropPhoto crop={row.crop} src={coverOf(row.media)}>
-          <span className={cn(PHOTO_CHIP, "absolute bottom-2 left-2 max-w-[calc(100%-1rem)]")}>
-            <span className={cn("inline-flex h-7 max-w-full items-center gap-1.5 rounded-full px-2.5 text-sm font-medium", state.tone)}>
-              <Icon className="size-4 shrink-0" /> <span className="truncate">{statusText(t, status)}</span>
-            </span>
-          </span>
-        </CropPhoto>
-        <div className="flex flex-1 flex-col p-3 sm:p-4">
-          <p className="text-lg leading-tight font-semibold break-words">{cropName(row.crop, lang)}</p>
-          <p className="tabular mt-1 text-[15px]">
+    <motion.li initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index, 8) * 0.04 }}>
+      <Link
+        href={hrefFor(row)}
+        className="flex items-center gap-4 rounded-3xl border bg-card p-3 transition-colors hover:border-foreground/30 active:scale-[0.99] sm:p-4"
+      >
+        <div className="relative size-20 shrink-0 overflow-hidden rounded-2xl bg-muted">{thumb && <MediaImage src={thumb} sizes="80px" />}</div>
+        <div className="min-w-0 flex-1">
+          <p className="text-lg leading-tight font-semibold">{cropName(row.crop, lang)}</p>
+          <p className="tabular mt-0.5 text-[15px]">
             {formatQty(row.quantity, row.unit, lang)}
             {price ? (
               <>
@@ -131,16 +119,19 @@ function HarvestCard({ row, index, removeLabel, removing, onRemove }: { row: Row
               </>
             ) : null}
           </p>
-          {row.listing?.status === "ACTIVE" && (
-            <p className="mt-0.5 text-sm text-muted-foreground">{t("home.left", { qty: formatQty(row.listing.availableQty, row.unit, lang) })}</p>
-          )}
-          <div className="mt-auto pt-2">
-            {action && <p className="text-sm font-semibold underline underline-offset-4">{action}</p>}
-            <p className="mt-1 text-xs text-muted-foreground">{t("home.added", { when: timeAgo(row.createdAt, lang) })}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-sm font-medium", state.tone)}>
+              <Icon className="size-4" /> {statusText(t, status)}
+            </span>
+            {row.listing?.status === "ACTIVE" && (
+              <span className="text-sm text-muted-foreground">{t("home.left", { qty: formatQty(row.listing.availableQty, row.unit, lang) })}</span>
+            )}
+            {action && <span className="text-sm font-semibold underline underline-offset-4">{action}</span>}
           </div>
+          <p className="mt-1 text-xs text-muted-foreground">{t("home.added", { when: timeAgo(row.createdAt, lang) })}</p>
         </div>
+        <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
       </Link>
-      <PhotoDeleteButton label={removeLabel} busy={removing} onClick={onRemove} />
     </motion.li>
   );
 }

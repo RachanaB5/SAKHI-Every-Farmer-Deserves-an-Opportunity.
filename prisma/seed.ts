@@ -12,7 +12,6 @@ import { SERVICE_AREAS, VILLAGES, MANDIS, haversineKm, coordsFor } from "../lib/
 import { hashPin } from "../lib/auth/password";
 import { orderTotals, settlementFor, courierCost, DEFAULT_COMMISSION_PCT, round2 } from "../lib/fees";
 import { nextRun } from "../lib/subscription-schedule";
-import { COMPLAINT_ISSUES, blendWithReviews, startingScore, type PhotoVerdict, type ReviewSignal } from "../lib/quality/score";
 
 const prisma = new PrismaClient();
 
@@ -127,7 +126,6 @@ async function wipe() {
   await prisma.$transaction([
     prisma.auditLog.deleteMany(),
     prisma.feedback.deleteMany(),
-    prisma.notification.deleteMany(),
     prisma.deliveryAttempt.deleteMany(),
     prisma.delivery.deleteMany(),
     prisma.settlement.deleteMany(),
@@ -331,9 +329,6 @@ async function main() {
         aiFlags: opts.flags ?? [],
         aiSummary: `Uniform colour and firm skin across visible ${info.names.en.toLowerCase()}; no rot or mould detected in sampled frames.`,
         aiSource: "fallback",
-        aiDetectedCrop: opts.crop,
-        aiCropMatch: "match",
-        aiConfidence: 0.85,
         reviewedById: admin.id,
         reviewedAt: createdAt,
         createdAt: hoursAgo((opts.createdHoursAgo ?? opts.harvestHoursAgo - 2) + 1),
@@ -367,7 +362,6 @@ async function main() {
         status: opts.status ?? (opts.available <= 0 ? "SOLD_OUT" : "ACTIVE"),
         area,
         grade: batch.grade,
-        qualityScore: startingScore(score, batch.grade),
         harvestDate: batch.harvestDate,
         imageUrl: image,
         minOrderQty: info.unit === "dozen" ? 1 : info.unit === "litre" ? 1 : 0.5,
@@ -744,66 +738,6 @@ async function main() {
         issue: bad ? pick(["NOT_FRESH", "SHORT_QTY", "DAMAGED"]) : "NONE",
         comment: bad ? pick(["Leaves were wilted on arrival", "Received less than ordered", "Some pieces were crushed"]) : pick(["Super fresh!", "Tasted like home-grown", "Great quality, on time", null]),
         createdAt: new Date(o.createdAt.getTime() + 12 * 3_600_000),
-      },
-    });
-  }
-
-  // ── Live listing quality: each listing's photo score blended with the reviews
-  // above (lib/quality/score.ts), plus the farmer's notifications for
-  // complaints and grade changes, as the feedback route would have created.
-  const reviewed = await prisma.feedback.findMany({
-    orderBy: { createdAt: "asc" },
-    select: { buyerId: true, rating: true, issue: true, photoVerdict: true, createdAt: true, listingId: true, order: { select: { code: true, farmerId: true, items: { select: { listingId: true } } } } },
-  });
-  const signals = new Map<string, ReviewSignal[]>();
-  for (const f of reviewed) {
-    for (const id of new Set(f.listingId ? [f.listingId] : f.order.items.map((i) => i.listingId))) {
-      signals.set(id, [...(signals.get(id) ?? []), { ...f, photoVerdict: f.photoVerdict as PhotoVerdict | null }]);
-    }
-  }
-  const crops = new Map<string, string>();
-  for (const l of await prisma.listing.findMany({ include: { batch: { select: { aiQualityScore: true, aiConfidence: true, grade: true } } } })) {
-    crops.set(l.id, l.crop);
-    const reviews = signals.get(l.id) ?? [];
-    if (!reviews.length) continue;
-    const r = blendWithReviews({ score: startingScore(l.batch.aiQualityScore, l.batch.grade), confidence: l.batch.aiConfidence }, reviews);
-    const base = l.title.replace(/ · Grade [ABC]$/, "");
-    const at = reviews[reviews.length - 1].createdAt;
-    await prisma.listing.update({
-      where: { id: l.id },
-      data: {
-        qualityScore: r.score,
-        grade: r.grade,
-        reviewCount: r.reviewCount,
-        complaintCount: r.complaintCount,
-        title: r.grade === "A" ? `${base} · Grade A` : base,
-        ...(r.grade !== l.grade && { gradeUpdatedAt: at }),
-      },
-    });
-    if (l.grade && r.grade && r.score !== null && r.grade !== l.grade) {
-      await prisma.notification.create({
-        data: {
-          userId: l.farmerId,
-          type: r.grade > l.grade ? "GRADE_DOWN" : "GRADE_UP",
-          data: { listingId: l.id, crop: l.crop, from: l.grade, to: r.grade, score: Math.round(r.score), reviews: r.reviewCount, complaints: r.complaintCount },
-          link: "/farmer/listings",
-          createdAt: at,
-        },
-      });
-    }
-  }
-  for (const f of reviewed) {
-    if (!f.issue || !(COMPLAINT_ISSUES as readonly string[]).includes(f.issue)) continue;
-    const listingId = f.listingId ?? f.order.items[0].listingId;
-    await prisma.notification.create({
-      data: {
-        userId: f.order.farmerId,
-        type: "QUALITY_COMPLAINT",
-        data: { listingId, crop: crops.get(listingId) ?? "", issue: f.issue, rating: f.rating, withPhoto: false, photoBacked: false, orderCode: f.order.code },
-        link: "/farmer/listings",
-        createdAt: f.createdAt,
-        // Older complaints have been seen already.
-        readAt: Date.now() - f.createdAt.getTime() > 3 * 86_400_000 ? f.createdAt : null,
       },
     });
   }

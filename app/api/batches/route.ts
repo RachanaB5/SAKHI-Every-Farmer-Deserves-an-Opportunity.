@@ -6,10 +6,10 @@ import { handler } from "@/lib/api";
 import { createDraftBatch, serializeBatch } from "@/lib/batches";
 import { batchDetailsSchema } from "@/lib/validators/batch";
 
-/** Lists the signed-in farmer's batches with media, minus ones whose listing they removed. */
+/** Lists the signed-in farmer's batches with media. */
 export const GET = handler({ roles: ["FARMER"] }, async ({ user }) => {
   const batches = await db.batch.findMany({
-    where: { farmerId: user.id, OR: [{ listing: { is: null } }, { listing: { status: { not: "REMOVED" } } }] },
+    where: { farmerId: user.id },
     include: {
       media: { orderBy: { createdAt: "asc" } },
       listing: { select: { id: true, status: true, availableQty: true, pricePerUnit: true } },

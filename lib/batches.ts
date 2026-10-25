@@ -8,7 +8,6 @@ import { HttpError } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { CROPS, type CropSlug } from "@/lib/crops";
 import { publish } from "@/lib/events";
-import { removeOwnListing } from "@/lib/listings";
 import { normaliseForAI } from "@/lib/media";
 import { readFile } from "@/lib/storage";
 import type { BatchDetails } from "@/lib/validators/batch";
@@ -65,9 +64,6 @@ export function serializeBatch(b: Batch & { media?: MediaAsset[] }) {
     aiFlags: (b.aiFlags as string[] | null) ?? [],
     aiSummary: b.aiSummary,
     aiSource: b.aiSource,
-    aiDetectedCrop: b.aiDetectedCrop,
-    aiCropMatch: b.aiCropMatch as "match" | "mismatch" | "unsure" | null,
-    aiConfidence: b.aiConfidence,
     transcript: b.voiceTranscript,
     inputLanguage: b.inputLanguage,
     adminNote: b.adminNote,
@@ -157,9 +153,6 @@ export async function submitBatch(farmer: { id: string; role: string }, batchId:
       aiFlags: quality.data.flags,
       aiSummary: quality.data.summary,
       aiSource: quality.source,
-      aiDetectedCrop: quality.data.detected?.label ?? null,
-      aiCropMatch: quality.data.match,
-      aiConfidence: quality.data.confidence,
       adminNote: batch.status === "RESUBMIT" ? batch.adminNote : null,
     },
     include: { media: true },
@@ -169,32 +162,8 @@ export async function submitBatch(farmer: { id: string; role: string }, batchId:
     action: batch.status === "RESUBMIT" ? "BATCH_RESUBMITTED" : "BATCH_SUBMITTED",
     entity: "Batch",
     entityId: batch.id,
-    meta: {
-      score: quality.data.score,
-      source: quality.source,
-      duplicates: batch.media.filter((m) => m.isDuplicate).length,
-      detected: quality.data.detected?.label ?? null,
-      match: quality.data.match,
-    },
+    meta: { score: quality.data.score, source: quality.source, duplicates: batch.media.filter((m) => m.isDuplicate).length },
   });
   publish({ type: "batch.updated", id: batch.id, roles: ["ADMIN"], userIds: [farmer.id], data: { status: "PENDING_REVIEW" } });
   return { batch: updated, alreadySubmitted: false };
-}
-
-/**
- * Farmer removes a harvest. One that never went live (draft, in review,
- * sent back, rejected) is deleted with its media rows, which also withdraws
- * it from the admin queue. One that became a listing takes the listing down
- * instead (see removeOwnListing), so its orders and reviews stay intact.
- */
-export async function removeOwnBatch(farmer: { id: string; role: string }, id: string) {
-  const batch = await loadBatch(id, farmer, "owner");
-  const listing = await db.listing.findUnique({ where: { batchId: batch.id }, select: { id: true } });
-  if (listing) return { id: batch.id, deleted: false, listing: await removeOwnListing(farmer.id, listing.id) };
-  // Conditional, so an approval landing in between can't cascade into its new listing.
-  const gone = await db.batch.deleteMany({ where: { id: batch.id, listing: { is: null } } });
-  if (gone.count === 0) throw new HttpError(409, "This harvest just went live, refresh and try again");
-  await audit({ actorId: farmer.id, action: "BATCH_DELETED", entity: "Batch", entityId: batch.id, meta: { crop: batch.crop, status: batch.status, media: batch.media.length } });
-  publish({ type: "batch.updated", id: batch.id, roles: ["ADMIN"], userIds: [farmer.id], data: { status: "DELETED" } });
-  return { id: batch.id, deleted: true, listing: null };
 }

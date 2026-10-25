@@ -1,6 +1,5 @@
-// Household sign-up: just the sign-in details (name, mobile proven with a
-// texted code, PIN typed twice), language and an optional delivery address.
-// Creates a CONSUMER account.
+// Household sign-up: just the sign-in details (name, mobile, PIN), language
+// and an optional delivery address. Creates a CONSUMER account.
 "use client";
 
 import { Loader2 } from "lucide-react";
@@ -8,8 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AreaField, LanguageField, NewPinFields, TextField, pinsReady } from "@/components/auth/join/fields";
-import { PhoneVerify } from "@/components/auth/phone-verify";
+import { AreaField, LanguageField, PinField, TextField } from "@/components/auth/join/fields";
 import { Button } from "@/components/ui/button";
 import { UNSERVED_AREAS } from "@/lib/areas";
 import { sendJSON } from "@/lib/fetcher";
@@ -19,9 +17,7 @@ import { sendJSON } from "@/lib/fetcher";
  */
 export function HouseholdForm({ google }: { google?: { name: string; email: string } | null }) {
   const router = useRouter();
-  const [f, setF] = useState({ name: google?.name ?? "", phone: "", pin: "", pin2: "", language: "en", area: "", address: "" });
-  const [verified, setVerified] = useState(false);
-  const ready = verified && (Boolean(google) || pinsReady(f.pin, f.pin2));
+  const [f, setF] = useState({ name: google?.name ?? "", phone: "", pin: "", language: "en", area: "", address: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (v: string) => setF((s) => ({ ...s, [k]: v }));
@@ -51,10 +47,10 @@ export function HouseholdForm({ google }: { google?: { name: string; email: stri
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
-      <PhoneVerify phone={f.phone} onPhone={set("phone")} purpose="SIGNUP" verified={verified} onVerified={setVerified} />
-      {!google && <NewPinFields pin={f.pin} onPin={set("pin")} confirm={f.pin2} onConfirm={set("pin2")} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField label="Full name" id="name" autoComplete="name" value={f.name} onChange={set("name")} />
+        <TextField label="Mobile number" id="phone" inputMode="tel" autoComplete="tel-national" placeholder="98765 43210" value={f.phone} onChange={set("phone")} />
+        {!google && <PinField value={f.pin} onChange={set("pin")} />}
         <LanguageField value={f.language} onChange={set("language")} />
         <AreaField value={f.area} onChange={set("area")} label="Where should we deliver?" />
         <TextField label="Street / landmark (optional)" id="address" autoComplete="street-address" value={f.address} onChange={set("address")} />
@@ -68,7 +64,7 @@ export function HouseholdForm({ google }: { google?: { name: string; email: stri
           {error}
         </p>
       )}
-      <Button type="submit" size="lg" className="w-full" disabled={busy || !ready}>
+      <Button type="submit" size="lg" className="w-full" disabled={busy}>
         {busy ? <Loader2 className="animate-spin" /> : "Create account"}
       </Button>
       <p className="text-sm text-muted-foreground">

@@ -189,17 +189,9 @@ export function ReviewDetail({ id }: { id: string }) {
             <p className="font-semibold">Visual assessment</p>
             <AISourceBadge source={data.aiSource} />
           </div>
-          {data.aiQualityScore !== null || data.aiSummary ? (
+          {data.aiQualityScore !== null ? (
             <div className="mt-4 flex flex-col items-center gap-4 @md/ai:flex-row @md/ai:items-start">
-              {data.aiQualityScore !== null ? (
-                <ScoreGauge score={data.aiQualityScore} size={116} label={`Grade ${data.grade ?? "-"}`} />
-              ) : (
-                <span className="grid size-29 shrink-0 place-items-center rounded-full border-4 border-dashed border-muted-foreground/30 text-center text-sm font-semibold text-muted-foreground">
-                  Not
-                  <br />
-                  detectable
-                </span>
-              )}
+              <ScoreGauge score={data.aiQualityScore} size={116} label={`Grade ${data.grade ?? "-"}`} />
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] leading-relaxed">{data.aiSummary}</p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -213,7 +205,6 @@ export function ReviewDetail({ id }: { id: string }) {
                     <span className="rounded-full bg-success/12 px-2.5 py-1 text-xs font-medium text-success">No visual flags</span>
                   )}
                 </div>
-                {data.aiCropMatch && <CropCheck crop={data.crop} detected={data.aiDetectedCrop} match={data.aiCropMatch} confidence={data.aiConfidence} />}
               </div>
             </div>
           ) : (
@@ -348,30 +339,6 @@ function Stat({ k, v, warn }: { k: string; v: number; warn?: boolean }) {
       <dd className="tabular text-xl font-semibold">{v}</dd>
       <dt className="text-[11px] text-muted-foreground">{k}</dt>
     </div>
-  );
-}
-
-/** Declared crop vs what the vision model sees, plus how far the photo score can be trusted. */
-function CropCheck({ crop, detected, match, confidence }: { crop: string; detected: string | null; match: "match" | "mismatch" | "unsure"; confidence: number | null }) {
-  const seen = detected ? cropName(detected).replace(/_/g, " ") : "something else";
-  return (
-    <p className={cn("mt-3 rounded-2xl p-3 text-sm", match === "mismatch" ? "border border-warning/50 bg-warning/10" : "bg-muted/60")}>
-      {match === "mismatch" ? (
-        <span className="inline-flex items-start gap-1.5">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          <span>
-            Farmer wrote <b>{cropName(crop)}</b>, but the photos look like <b>{seen}</b>.
-          </span>
-        </span>
-      ) : match === "match" ? (
-        <>Photos match the declared crop ({cropName(crop)}).</>
-      ) : (
-        <>
-          Couldn&apos;t confirm the photos show {cropName(crop)}; the closest match is {seen}.
-        </>
-      )}
-      {confidence !== null && <span className="text-muted-foreground"> Score confidence {Math.round(confidence * 100)}%: low confidence means customer reviews will move the grade faster.</span>}
-    </p>
   );
 }
 

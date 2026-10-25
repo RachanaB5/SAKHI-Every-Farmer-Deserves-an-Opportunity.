@@ -21,13 +21,12 @@ export const POST = handler({ body: sellerOnboardingSchema }, async ({ body, req
   const at = coordsFor(body.village) ?? coordsFor(body.area);
   const line = `${body.addressLine}, ${body.village}, ${body.district}, ${body.state} ${body.pincode}`;
   const { pin, ...answers } = body;
-  const creds = await accountCredentials(pin, body.phone);
+  const creds = await accountCredentials(pin);
   const user = await db.user.create({
     data: {
       name: body.contactName,
       phone: body.phone,
       pinHash: creds.pinHash,
-      phoneVerifiedAt: creds.phoneVerifiedAt,
       ...creds.google,
       role: "FARMER",
       language: body.language,

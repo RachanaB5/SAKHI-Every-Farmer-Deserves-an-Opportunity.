@@ -9,7 +9,6 @@ import { audit } from "@/lib/audit";
 import { CROPS, isCropSlug } from "@/lib/crops";
 import { publish } from "@/lib/events";
 import { computePriceAdvice } from "@/lib/pricing";
-import { startingScore } from "@/lib/quality/score";
 
 export type Decision = "APPROVE" | "REJECT" | "RESUBMIT";
 
@@ -85,8 +84,6 @@ export async function decideBatch(args: {
           availableQty: batch.quantityKg,
           area,
           grade,
-          // The live score starts from the photo check and then follows customer reviews (lib/quality).
-          qualityScore: startingScore(batch.aiQualityScore, grade),
           harvestDate: batch.harvestDate,
           imageUrl: cover?.url ?? (isCropSlug(batch.crop) ? CROPS[batch.crop].image : null),
           minOrderQty: batch.unit === "kg" ? 0.5 : 1,

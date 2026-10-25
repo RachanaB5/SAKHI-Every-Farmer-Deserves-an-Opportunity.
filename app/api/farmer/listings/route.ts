@@ -1,14 +1,13 @@
-// GET /api/farmer/listings — the signed-in farmer's listings in every state
-// except the ones they removed.
+// GET /api/farmer/listings — the signed-in farmer's listings in every state.
 import { db } from "@/lib/db";
 import { handler } from "@/lib/api";
 import { soldQty } from "@/lib/inventory";
 
-/** Live, paused and sold-out listings with stock split and live quality. */
+/** Live, paused and sold-out listings with stock split and quality. */
 export const GET = handler({ roles: ["FARMER"] }, async ({ user }) => {
   const rows = await db.listing.findMany({
-    where: { farmerId: user.id, status: { not: "REMOVED" } },
-    include: { batch: { select: { aiQualityScore: true } }, _count: { select: { orderItems: true } } },
+    where: { farmerId: user.id },
+    include: { batch: { select: { aiQualityScore: true, grade: true } }, _count: { select: { orderItems: true } } },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     take: 100,
   });
@@ -28,12 +27,7 @@ export const GET = handler({ roles: ["FARMER"] }, async ({ user }) => {
     harvestDate: l.harvestDate.toISOString(),
     createdAt: l.createdAt.toISOString(),
     orders: l._count.orderItems,
-    /** Live score (photos + customer reviews) and the photo score it started from. */
-    quality: l.qualityScore !== null ? Math.round(l.qualityScore) : l.batch.aiQualityScore,
-    photoScore: l.batch.aiQualityScore,
-    grade: l.grade,
-    reviews: l.reviewCount,
-    complaints: l.complaintCount,
-    gradeUpdatedAt: l.gradeUpdatedAt?.toISOString() ?? null,
+    quality: l.batch.aiQualityScore,
+    grade: l.batch.grade,
   }));
 });

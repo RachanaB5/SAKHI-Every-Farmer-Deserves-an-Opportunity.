@@ -19,14 +19,13 @@ export const POST = handler({ body: registerSchema }, async ({ body, req }) => {
   const exists = await db.user.findUnique({ where: { phone: body.phone } });
   if (exists) throw new HttpError(409, "An account with this phone number already exists");
 
-  const creds = await accountCredentials(body.pin, body.phone);
+  const creds = await accountCredentials(body.pin);
   const at = coordsFor(body.village) ?? coordsFor(body.area);
   const user = await db.user.create({
     data: {
       name: body.name,
       phone: body.phone,
       pinHash: creds.pinHash,
-      phoneVerifiedAt: creds.phoneVerifiedAt,
       ...creds.google,
       role: body.role,
       language: body.language,

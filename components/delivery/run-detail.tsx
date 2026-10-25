@@ -1,8 +1,6 @@
-// Rider view of one run: route, items, contacts, "I've reached the farm"
-// (the farmer is told and checks the order code), "picked up" (or the
-// farmer confirms it), then OTP handover (keypad or spoken digits). The
-// server decides — this screen only collects the customer's code. Success
-// shows a full celebration.
+// Rider view of one run: route, items, contacts, "picked up", then OTP
+// handover (keypad or spoken digits). The server decides — this screen
+// only collects the customer's code. Success shows a full celebration.
 "use client";
 
 import { AlertTriangle, ArrowLeft, Loader2, MapPin, Package, Phone, Sprout } from "lucide-react";
@@ -76,19 +74,6 @@ export function RunDetail({ id }: { id: string }) {
     }
   }
 
-  async function arrived() {
-    setBusy(true);
-    try {
-      await sendJSON(`/api/deliveries/${id}/arrived`);
-      toast.success("The farmer knows you're here");
-      mutate();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function report(reason: string) {
     try {
       await sendJSON(`/api/deliveries/${id}/problem`, { reason });
@@ -132,29 +117,9 @@ export function RunDetail({ id }: { id: string }) {
 
       <div className="mt-5">
         {status === "ASSIGNED" && (
-          <div className="space-y-3">
-            {o.delivery?.arrivedAt ? (
-              <section className="rounded-3xl border-2 border-lime bg-card p-4 text-center">
-                <p className="text-sm text-muted-foreground">Show the farmer this order code</p>
-                <p className="mt-1 font-mono text-4xl font-semibold tracking-wider">{o.code}</p>
-                <p className="mt-2 text-xs text-muted-foreground">The farmer confirms the handover in FoodFlow and this screen moves on by itself. If they can&apos;t, tap “Picked up from farm”.</p>
-              </section>
-            ) : (
-              <>
-                {o.delivery?.farmEta && (
-                  <p className="text-center text-sm text-muted-foreground">
-                    Reach the farm by <b className="text-foreground">{new Date(o.delivery.farmEta).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}</b>
-                  </p>
-                )}
-                <Button size="lg" className="w-full" onClick={arrived} disabled={busy}>
-                  {busy ? <Loader2 className="animate-spin" /> : <MapPin />} I&apos;ve reached the farm
-                </Button>
-              </>
-            )}
-            <Button size="lg" variant={o.delivery?.arrivedAt ? "default" : "outline"} className="w-full" onClick={pickedUp} disabled={busy}>
-              {busy ? <Loader2 className="animate-spin" /> : <Package />} Picked up from farm
-            </Button>
-          </div>
+          <Button size="lg" className="w-full" onClick={pickedUp} disabled={busy}>
+            {busy ? <Loader2 className="animate-spin" /> : <Package />} Picked up from farm
+          </Button>
         )}
         {status === "PICKED_UP" && !success && (
           <section className="rounded-3xl border-2 border-lime bg-card p-4">

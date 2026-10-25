@@ -120,18 +120,6 @@ export async function verifyHandover(orderId: string, actor: Pick<User, "id" | "
   return { ok: true, already: false, status: finalStatus, settlementNet: amounts.net };
 }
 
-/** The parcel left the farm with the rider: delivery PICKED_UP, order OUT_FOR_DELIVERY. */
-async function collectFromFarm(deliveryId: string, orderId: string, actorId: string, note: string) {
-  await withTxRetry(async (tx) => {
-    const moved = await tx.delivery.updateMany({ where: { id: deliveryId, status: "ASSIGNED" }, data: { status: "PICKED_UP", pickedUpAt: new Date() } });
-    // Throwing (not returning) rolls back the delivery change if the order can't move.
-    if (moved.count !== 1) throw new HttpError(409, "This run can't be marked picked up right now");
-    const ok = await moveOrder(tx, orderId, "OUT_FOR_DELIVERY", { from: ["PACKED"], actorId, note });
-    if (!ok) throw new HttpError(409, "The farmer hasn't packed this order yet");
-  });
-  await notify(orderId);
-}
-
 /**
  * Rider confirms they collected the parcel from the farm:
  * delivery PICKED_UP, order OUT_FOR_DELIVERY.
@@ -140,29 +128,13 @@ export async function riderPickedUp(orderId: string, rider: Pick<User, "id">) {
   const d = await db.delivery.findUnique({ where: { orderId } });
   if (!d || d.workerId !== rider.id) throw new HttpError(403, "You're not the rider assigned to this order");
   if (d.status === "PICKED_UP") return { already: true };
-  await collectFromFarm(d.id, orderId, rider.id, "Rider collected the parcel");
-  return { already: false };
-}
-
-/**
- * The farmer confirms they gave the parcel to the assigned rider (Sakhi's
- * "Handed over"): the same move as the rider's "Picked up". It only moves
- * the order to out-for-delivery; the buyer's OTP still completes it.
- * @returns names for Sakhi's reply
- */
-export async function farmerHandedToRider(orderId: string, farmer: Pick<User, "id">) {
-  const order = await db.order.findUnique({
-    where: { id: orderId },
-    select: { code: true, farmerId: true, fulfilment: true, buyer: { select: { name: true, orgName: true } }, delivery: { select: { id: true, status: true, workerId: true, worker: { select: { name: true } } } } },
+  await withTxRetry(async (tx) => {
+    const moved = await tx.delivery.updateMany({ where: { id: d.id, status: "ASSIGNED" }, data: { status: "PICKED_UP", pickedUpAt: new Date() } });
+    // Throwing (not returning) rolls back the delivery change if the order can't move.
+    if (moved.count !== 1) throw new HttpError(409, "This run can't be marked picked up right now");
+    const ok = await moveOrder(tx, orderId, "OUT_FOR_DELIVERY", { from: ["PACKED"], actorId: rider.id, note: "Rider collected the parcel" });
+    if (!ok) throw new HttpError(409, "The farmer hasn't packed this order yet");
   });
-  if (!order) throw new HttpError(404, "Order not found");
-  if (order.farmerId !== farmer.id) throw new HttpError(403, "This order belongs to another farmer");
-  const d = order.delivery;
-  if (order.fulfilment !== "DELIVERY" || !d?.workerId) throw new HttpError(409, "No rider is booked for this order yet");
-  const names = { code: order.code, rider: d.worker?.name ?? "", buyer: order.buyer.orgName ?? order.buyer.name };
-  if (d.status === "PICKED_UP" || d.status === "DELIVERED") return { already: true, ...names };
-  await collectFromFarm(d.id, orderId, farmer.id, `Handed to ${names.rider}, confirmed by the farmer`);
-  await audit({ actorId: farmer.id, action: "HANDED_TO_RIDER", entity: "Order", entityId: orderId, meta: { riderId: d.workerId } });
-  publish({ type: "delivery.updated", id: orderId, userIds: [d.workerId, farmer.id], roles: ["ADMIN"] });
-  return { already: false, ...names };
+  await notify(orderId);
+  return { already: false };
 }

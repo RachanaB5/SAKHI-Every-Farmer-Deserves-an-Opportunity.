@@ -24,8 +24,7 @@ Status of each build phase, what's next, and the decisions made along the way.
   validated with Zod, and a deterministic fallback for every capability (sharp-based visual
   heuristic, multilingual listing + grocery parsers, template price explanations). Every result is
   tagged `ai` or `fallback` and the UI labels it.
-- Harvest wizard (`/farmer/batches/new`): details → photos/video → price → review. Listing by voice
-  goes through Sakhi, which drafts the batch and hands it to the wizard.
+- Harvest wizard (`/farmer/batches/new`): voice or typed details → photos/video → price → review.
   DRAFT batch after step 1; each upload hashed (SHA-256), duplicate-checked across batches, EXIF
   stamped; video frames extracted client-side; submit re-runs the visual check server-side.
 - `/api/ai/quality`, `/api/ai/parse-listing`, `/api/ai/price-advice` (numbers from DB, AI only words)
@@ -126,40 +125,6 @@ hard-coded 5% for farmers with no sales, an empty mandi chart for new farmers, t
 message naming paused areas, sign-up offering languages the UI doesn't ship, an unlabelled slider,
 a tight sign-up rate limit for shared Wi-Fi, and remaining untranslated farmer labels and relative times.
 
-## Phase 7 — Gemini photo check & review-driven grades ✅
-
-- **Photo check by Gemini** (`lib/ai/vision`): what the photos show, whether it matches the declared crop,
-  mixes and stock photos / collages, visible condition (0–100) and defects. A score only when the photos
-  clearly show the declared produce; otherwise *not detectable* with the reason (no score, never a guess).
-  Without a key or when Gemini is down, the same "not detectable", and an admin reviews the photos. A second
-  model with its own quota answers when the main one is rate-limited. (A locally trained MobileNetV3 was
-  tried first; it reached 95% on its validation set but only 70% on real field photos, so it was removed in
-  favour of Gemini, along with the old offline image heuristic that scored any image.)
-- **Fair to cheap cameras**: photo sharpness / light are measured locally and only set confidence; the
-  prompt tells Gemini to judge produce, not photography.
-- **Crop check**: mismatches get a `crop_mismatch` flag for the admin and a one-tap "Change to onion" for the farmer.
-- **Fruits** in the catalogue (banana, mango, apple, orange, grapes, pomegranate, guava, papaya) with
-  EN/HI/KN/TA/TE names, voice aliases and public-domain photos.
-- **Review-driven grades** (`lib/quality`): the photo score (or the admin's grade) is a prior worth 2–8
-  reviews; each buyer's latest review moves the listing's live score and grade, so bad reviews pull it down;
-  photo-backed complaints count more, one buyer alone can't change the grade, lateness/short weight don't
-  count. Ungraded listings get their score from reviews alone. Buyers can say which item a review is about.
-- **Farmer notifications**: bell in the farmer shell (live over SSE, EN/HI/KN) for complaints and grade changes.
-- Tests: photo-check verdicts, quality scoring, photo-evidence verdicts, the review → grade → notification
-  loop on the test DB, the photo-quality check.
-
-## Phase 8 — Phone verification, mixed-language numbers, natural voices ✅
-
-- **Phone verification**: joining (household, restaurant, seller wizard, Google) texts a 6-digit code;
-  the account is only created for a proven number, and the PIN is typed twice. "Forgot PIN?" on sign-in
-  proves the number the same way and sets a new PIN. MSG91 / Twilio providers, on-screen code for
-  development and labelled demos (`lib/auth/phone-code.ts`, `lib/sms.ts`).
-- **Numbers in any language mix**: English numbers said in Hindi or Kannada mode, as those recognisers write
-  them ("फिफ्टी", "ट्वेंटी फाइव", "ಫಿಫ್ಟಿ"), parse as numbers in listings, prices and mobile numbers.
-- **Voices**: Sakhi's own Hindi voice (SYSPIN, `npm run voice:hindi`) on devices without a natural Hindi
-  voice, with Hindi number words and English in Devanagari; the server voices share one engine
-  (`lib/tts/vits.ts`). Device voices: natural first, Indian English among equals, robotic desktop voices last.
-
 ## Decisions
 
 | Decision | Why |
@@ -175,7 +140,7 @@ a tight sign-up rate limit for shared Wi-Fi, and remaining untranslated farmer l
 | Demo farmer in English | Ramesh starts in English so judges can follow; the EN/हि/ಕ switch shows the localisation. |
 | Seed photos | CC0 / Public Domain images from Openverse (credits in `public/seed/CREDITS.md`). Each seeded batch gets a distinct file so real SHA-256 hashes only collide on the intentional duplicate. |
 | Per-file uploads | Each photo/video uploads in its own request (works under serverless body limits, gives per-file progress and an immediate duplicate warning). |
-| No offline photo score | The original offline heuristic (saturation, exposure, blotches) scored any image, rewarded bright photos and couldn't tell a tomato from a collage, so it was removed (Phase 7): without Gemini the photo check says "not detectable" and a person reviews the photos. |
+| Visual fallback is a real heuristic | Without a model key, sharp measures saturation, exposure, brown/dark blotches and detail — labelled "Offline estimate", never presented as AI. |
 | Frames for AI, video for humans | Videos are stored as evidence for admins; three client-extracted JPEG frames feed the visual check. |
 | Quality is recomputed on submit | The wizard's preview isn't trusted; submit re-runs the check on stored media (cached, so it's consistent and free). |
 | Test DB | Vitest builds a throwaway `prisma/test.db` by deleting the file and pushing the schema (no destructive reset of any real database). |
@@ -193,13 +158,4 @@ a tight sign-up rate limit for shared Wi-Fi, and remaining untranslated farmer l
 | Daily cron | Vercel Hobby allows one cron per day, so the bundled schedule runs at 04:00 IST; any external scheduler can call `run-due` more often with `CRON_SECRET`. |
 | Client-only date forms | "Today" must be the farmer's today. Server rendering used the server's clock (UTC on Vercel), so the two date-driven forms render in the browser only. |
 | Live landing numbers | The landing page reads impact counters and the mandi ticker from the database on each request and shows zeros (not invented numbers) if the DB is unreachable. |
-| Photo quality never changes the score | Shrinking unsure scores towards a neutral grade still ranks farmers with poor cameras below others on average (most produce is fresh). So the photo check's answer stands; photo quality only sets how fast reviews can move the grade. |
-| "Not detectable" over a guess | A score for photos that don't clearly show the declared produce (or for produce whose freshness doesn't show) is noise that misleads buyers. No score is shown until the photos or customer reviews can support one. |
-| One buyer can't change a grade | A single complaint (or a single glowing review) moves the score within the current grade band; the grade changes once two different buyers agree, so one unhappy or malicious buyer can't sink a farmer. |
-| Eggs, milk and chicken: reviews decide | Their freshness isn't visible in a photo; the photo check says so and customer reviews (or the admin's grade) set the grade. |
-| Mismatch warns, never blocks | Gemini can be wrong on unusual varieties; a person approves every listing, so a mismatch is a flag for the admin and a prompt for the farmer. |
-| Ambiguous voice words | "आम" (mango) also means "common" and sits inside "आमदनी" (earnings), so it isn't a Sakhi crop term; "आम का" is. |
-| Verify the phone at sign-up | Sign-in is phone + PIN, so the phone must belong to the person. A code proves it once; the PIN (typed twice) is what they use every day, and "Forgot PIN?" re-proves the phone. |
-| No SMS provider in production = no codes | Showing codes on screen would make verification meaningless on a real site; a demo deployment opts in explicitly with `SMS_PROVIDER=console`. |
-| Hindi server voice only when needed | A natural device Hindi voice starts faster and sounds as good; the server voice replaces the robotic ones and is skipped for farmers who prefer a male voice (it is female). |
 | Smart basket weights | Price 0.30, ETA 0.27, freshness 0.25, visual score 0.18, +0.12 per extra item a farm covers — so a marginally cheaper lot 60 km away loses to a nearby fresher one. |

@@ -5,25 +5,19 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { coordsFor, haversineKm } from "@/lib/areas";
-import { CATEGORIES } from "@/lib/crops";
 import { db } from "@/lib/db";
 import { HttpError } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { publish } from "@/lib/events";
-import { IN_FLIGHT } from "@/lib/orders/state";
 import { caseVariants } from "@/lib/search";
 import { round2 } from "@/lib/fees";
 
 /** Categories a buyer in `area` may see (special ones need an explicit enable). */
 export async function visibleCategories(area: string | null | undefined): Promise<string[]> {
   const cats = await db.category.findMany();
-  // Catalogue categories added after a database was seeded (e.g. fruits) have
-  // no row yet; ordinary ones are visible everywhere.
-  const missing = CATEGORIES.filter((c) => !c.special && !cats.some((row) => row.slug === c.slug)).map((c) => c.slug);
-  return [
-    ...cats.filter((c) => !c.special || ((c.enabledAreas as string[] | null) ?? []).includes(area ?? "")).map((c) => c.slug),
-    ...missing,
-  ];
+  return cats
+    .filter((c) => !c.special || ((c.enabledAreas as string[] | null) ?? []).includes(area ?? ""))
+    .map((c) => c.slug);
 }
 
 export const listingInclude = {
@@ -93,14 +87,8 @@ export function serializeListing(l: ListingRow, buyer?: { lat: number; lng: numb
       reliability: l.farmer.reliabilityScore,
     },
     quality: {
-      /** Live score: the photo score blended with customer reviews (lib/quality). */
-      score: l.qualityScore !== null ? Math.round(l.qualityScore) : l.batch.aiQualityScore,
-      grade: l.grade ?? l.batch.grade,
-      /** What the photo check said at approval. */
-      photoScore: l.batch.aiQualityScore,
-      photoGrade: l.batch.grade,
-      reviews: l.reviewCount,
-      complaints: l.complaintCount,
+      score: l.batch.aiQualityScore,
+      grade: l.batch.grade,
       flags: (l.batch.aiFlags as string[] | null) ?? [],
       summary: l.batch.aiSummary,
       source: l.batch.aiSource,
@@ -168,7 +156,6 @@ export async function updateOwnListing(farmerId: string, listingId: string, chan
   const l = await db.listing.findUnique({ where: { id: listingId } });
   if (!l) throw new HttpError(404, "Listing not found");
   if (l.farmerId !== farmerId) throw new HttpError(403, "This listing belongs to another farmer");
-  if (l.status === "REMOVED") throw new HttpError(409, "You removed this listing, list a new harvest to sell again");
   if (l.status === "SOLD_OUT" && change.status === "ACTIVE") throw new HttpError(409, "Sold out, list a new harvest to sell more");
   if (change.status === "ACTIVE" && l.availableQty <= 0) throw new HttpError(409, "No stock left to resume");
   const updated = await db.listing.update({
@@ -178,31 +165,4 @@ export async function updateOwnListing(farmerId: string, listingId: string, chan
   await audit({ actorId: farmerId, action: "LISTING_UPDATED", entity: "Listing", entityId: l.id, meta: { from: { price: l.pricePerUnit, status: l.status }, to: change } });
   publish({ type: "inventory.updated", id: l.id });
   return { before: l, after: updated };
-}
-
-/**
- * Farmer takes their own listing down for good. The row stays as REMOVED
- * (orders and reviews point at it) but buyers and the farmer's own lists
- * stop showing it. Refused while an order on it is still in progress;
- * open bulk offers made from it are withdrawn. Audit-logged.
- */
-export async function removeOwnListing(farmerId: string, listingId: string) {
-  const l = await db.listing.findUnique({ where: { id: listingId } });
-  if (!l) throw new HttpError(404, "Listing not found");
-  if (l.farmerId !== farmerId) throw new HttpError(403, "This listing belongs to another farmer");
-  if (l.status === "REMOVED") return { id: l.id, status: l.status };
-  const open = await db.orderItem.count({ where: { listingId: l.id, order: { status: { in: IN_FLIGHT } } } });
-  if (open > 0 || l.reservedQty > 0) {
-    throw new HttpError(409, "This product has orders in progress. Finish or cancel them first, or pause it to stop new orders.");
-  }
-  const offers = await db.offer.findMany({ where: { listingId: l.id, status: { in: ["PENDING", "COUNTERED"] } }, include: { demand: { select: { buyerId: true } } } });
-  await db.$transaction([
-    db.listing.update({ where: { id: l.id }, data: { status: "REMOVED" } }),
-    db.offer.updateMany({ where: { id: { in: offers.map((o) => o.id) } }, data: { status: "WITHDRAWN" } }),
-  ]);
-  await audit({ actorId: farmerId, action: "LISTING_REMOVED", entity: "Listing", entityId: l.id, meta: { from: l.status, available: l.availableQty, offersWithdrawn: offers.length } });
-  publish({ type: "inventory.updated", id: l.id, userIds: [farmerId], roles: ["CONSUMER", "BULK_BUYER"] });
-  publish({ type: "batch.updated", id: l.batchId, userIds: [farmerId] });
-  for (const o of offers) publish({ type: "offer.updated", id: o.id, userIds: [o.demand.buyerId, farmerId], roles: ["ADMIN"], data: { demandId: o.demandId } });
-  return { id: l.id, status: "REMOVED" as const };
 }

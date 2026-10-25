@@ -55,6 +55,5 @@ next-env.d.ts
 # local Claude Code state (settings.json is committed)
 /.claude/settings.local.json
 
-# Sakhi's Kannada and Hindi voices (npm run voice:kannada / voice:hindi)
+# Sakhi Kannada voice (built by scripts/kannada-voice/export.py)
 /models/
-

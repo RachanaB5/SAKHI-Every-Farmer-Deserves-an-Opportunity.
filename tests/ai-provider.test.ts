@@ -25,39 +25,32 @@ afterEach(() => {
 describe("GeminiProvider", () => {
   it("returns schema-valid JSON on the first try", async () => {
     fetchMock.mockResolvedValueOnce(reply({ basis: ["ok"] }));
-    await expect(new GeminiProvider("k", ["m"], 5000).generateJSON(req)).resolves.toEqual({ basis: ["ok"] });
+    await expect(new GeminiProvider("k", "m", 5000).generateJSON(req)).resolves.toEqual({ basis: ["ok"] });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("retries once on a transient 503", async () => {
     fetchMock.mockResolvedValueOnce(status(503)).mockResolvedValueOnce(reply({ basis: ["ok"] }));
-    await expect(new GeminiProvider("k", ["m"], 5000).generateJSON(req)).resolves.toEqual({ basis: ["ok"] });
+    await expect(new GeminiProvider("k", "m", 5000).generateJSON(req)).resolves.toEqual({ basis: ["ok"] });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("does not retry a 400", async () => {
     fetchMock.mockImplementation(() => Promise.resolve(status(400)));
-    await expect(new GeminiProvider("k", ["m"], 5000).generateJSON(req)).rejects.toThrow("HTTP 400");
+    await expect(new GeminiProvider("k", "m", 5000).generateJSON(req)).rejects.toThrow("HTTP 400");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("re-asks with the validation error when the output is invalid", async () => {
     fetchMock.mockResolvedValueOnce(reply({ wrong: true })).mockResolvedValueOnce(reply({ basis: ["fixed"] }));
-    await expect(new GeminiProvider("k", ["m"], 5000).generateJSON(req)).resolves.toEqual({ basis: ["fixed"] });
+    await expect(new GeminiProvider("k", "m", 5000).generateJSON(req)).resolves.toEqual({ basis: ["fixed"] });
     const second = JSON.parse(fetchMock.mock.calls[1][1].body as string).contents[0].parts[0].text as string;
     expect(second).toContain("previous reply was rejected");
   });
 
-  it("switches to the fallback model when the main one is rate-limited", async () => {
-    fetchMock.mockResolvedValueOnce(status(429)).mockResolvedValueOnce(reply({ basis: ["lite"] }));
-    await expect(new GeminiProvider("k", ["main", "lite"], 5000).generateJSON(req)).resolves.toEqual({ basis: ["lite"] });
-    expect(String(fetchMock.mock.calls[0][0])).toContain("/main:generateContent");
-    expect(String(fetchMock.mock.calls[1][0])).toContain("/lite:generateContent");
-  });
-
   it("gives up after two bad outputs", async () => {
     fetchMock.mockImplementation(() => Promise.resolve(reply({ wrong: true })));
-    await expect(new GeminiProvider("k", ["m"], 5000).generateJSON(req)).rejects.toThrow();
+    await expect(new GeminiProvider("k", "m", 5000).generateJSON(req)).rejects.toThrow();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

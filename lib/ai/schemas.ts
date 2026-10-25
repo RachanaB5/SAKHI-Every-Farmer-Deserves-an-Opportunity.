@@ -15,39 +15,17 @@ export const QUALITY_FLAGS = [
   "minor_blemishes",
   "low_light",
   "blurry_photo",
-  "overexposed",
   "not_produce",
-  "not_detectable",
-  "crop_mismatch",
-  "crop_unconfirmed",
-  "multiple_items",
-  "stock_photo",
 ] as const;
 export type QualityFlag = (typeof QUALITY_FLAGS)[number];
 
-/** A photo check result. score / grade are null when the photos can't be graded ("not detectable"). */
-export interface QualityCore {
-  score: number | null;
-  grade: "A" | "B" | "C" | null;
-  flags: QualityFlag[];
-  summary: string;
-}
-
-/** What harvest photos show, from Gemini (lib/ai/vision). */
-export const photoCheckSchema = z.object({
-  scene: z.enum(["single_produce", "mixed_produce", "not_produce", "unclear"]),
-  /** Main item, one of the labels in the prompt, or null when unclear or mixed. */
-  detected: z.string().nullable(),
-  /** Whether the declared crop is clearly the main subject (null when none was declared). */
-  showsDeclared: z.boolean().nullable(),
-  /** A collage, advert, stock / AI image, screenshot or photo with text: not the farmer's own harvest photo. */
-  stockOrCollage: z.boolean(),
-  /** 0–100 visible condition of the main produce; null when it can't be judged from these photos. */
-  condition: z.number().min(0).max(100).nullable(),
+export const qualitySchema = z.object({
+  score: z.number().int().min(0).max(100),
+  grade: z.enum(["A", "B", "C"]),
   flags: z.array(z.enum(QUALITY_FLAGS)).max(8),
-  summary: z.string().min(5).max(300),
+  summary: z.string().min(5).max(400),
 });
-export type PhotoContentCheck = z.infer<typeof photoCheckSchema>;
+export type QualityCore = z.infer<typeof qualitySchema>;
 
 export const parsedListingSchema = z.object({
   crop: z.string().nullable(),

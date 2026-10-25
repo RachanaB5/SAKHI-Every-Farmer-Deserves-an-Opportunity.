@@ -113,7 +113,6 @@ export async function setAvailableStock(farmerId: string, listingId: string, ava
   const l = await db.listing.findUnique({ where: { id: listingId }, include: { batch: { select: { quantityKg: true } } } });
   if (!l) throw new HttpError(404, "Listing not found");
   if (l.farmerId !== farmerId) throw new HttpError(403, "This listing belongs to another farmer");
-  if (l.status === "REMOVED") throw new HttpError(409, "You removed this listing, list a new harvest to sell again");
   const sold = soldQty(l);
   const cap = round2(Math.max(0, l.batch.quantityKg - sold - l.reservedQty));
   if (available < 0) throw new HttpError(400, "Stock can't be negative");

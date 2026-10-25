@@ -66,11 +66,8 @@ page explains what happens to a farmer's voice and words, in plain terms.
 
 ## Speaking back
 
-- English replies, and Hindi replies on devices with a natural Hindi voice, are spoken with the device's
-  built-in voices (`speechSynthesis`). (Some browsers' "online" voices are themselves provided by the
-  browser vendor's service.)
-- Hindi replies on devices without a natural Hindi voice are spoken by FoodFlow's own Hindi voice, exactly
-  like Kannada below: one sentence at a time to FoodFlow's `/api/tts`, never to a third party.
+- English and Hindi replies are spoken with the device's built-in voices (`speechSynthesis`). (Some
+  browsers' "online" voices are themselves provided by the browser vendor's service.)
 - Kannada replies are spoken by FoodFlow's own Kannada voice when the server has it installed: the reply
   text (one sentence at a time) goes to FoodFlow's server at `/api/tts`, never to a third party, and comes
   back as audio. The audio of each sentence is cached on the server so it isn't made twice; a sentence can

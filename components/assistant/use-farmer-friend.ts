@@ -60,11 +60,7 @@ const store = {
   },
 };
 
-/**
- * @param intercept - gets each request first (the order autopilot answers a
- *   "yes" or a buyer's code itself); resolves true when it has replied
- */
-export function useFarmerFriend({ autoVoice, intercept }: { autoVoice: boolean; intercept?: React.RefObject<(text: string) => Promise<boolean>> }) {
+export function useFarmerFriend({ autoVoice }: { autoVoice: boolean }) {
   const { lang, t } = useI18n();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [avatar, setAvatar] = useState<AvatarState>("idle");
@@ -123,8 +119,7 @@ export function useFarmerFriend({ autoVoice, intercept }: { autoVoice: boolean; 
         const result = await speak(text, voiceLang, { onStart: () => setAvatar("speaking"), onBoundary: () => setWord((w) => w + 1) });
         setAvatar((a) => (a === "speaking" ? "idle" : a));
         if (result === "no-voice" && msgId) setMessages((xs) => xs.map((m) => (m.id === msgId ? { ...m, voiceUnavailable: true } : m)));
-        // Several blocked announcements in a row are all read on the one tap.
-        if (result === "blocked") return setNeedTap((prev) => (prev && prev.lang === voiceLang ? { text: `${prev.text} ${text}`, lang: voiceLang } : { text, lang: voiceLang }));
+        if (result === "blocked") return setNeedTap({ text, lang: voiceLang });
         if (result === "interrupted") return;
       }
       if (listenAfter && handsFreeRef.current) listenRef.current();
@@ -203,9 +198,6 @@ export function useFarmerFriend({ autoVoice, intercept }: { autoVoice: boolean; 
       setBusy(true);
       setAvatar("thinking");
       try {
-        // A confirmation card on screen keeps its yes/no; otherwise the autopilot may answer first.
-        const confirming = messagesRef.current.some((m) => m.confirm === "pending");
-        if (!confirming && intercept?.current && (await intercept.current(text))) return;
         const r = await sendJSON<AssistantReply>("/api/assistant/interpret", {
           text,
           lang,
@@ -220,7 +212,7 @@ export function useFarmerFriend({ autoVoice, intercept }: { autoVoice: boolean; 
         setBusy(false);
       }
     },
-    [busy, failed, handleReply, intercept, lang, push, replyEnglish],
+    [busy, failed, handleReply, lang, push, replyEnglish],
   );
 
   const confirm = useCallback(
@@ -371,22 +363,6 @@ export function useFarmerFriend({ autoVoice, intercept }: { autoVoice: boolean; 
     setHandsFreeState(on);
   }, []);
 
-  /** Order news is spoken one item after another, so a burst isn't cut short. */
-  const speechQueue = useRef<Promise<void>>(Promise.resolve());
-
-  /**
-   * Says something the farmer didn't ask for (the order autopilot): shown at
-   * once, read aloud after whatever is being said (when auto voice is on).
-   */
-  const agentSay = useCallback(
-    (text: string, opts: { ok?: boolean; listenAfter?: boolean } = {}) => {
-      const id = push({ role: "assistant", text, ok: opts.ok ?? true });
-      setAvatar(opts.ok === false ? "error" : "idle");
-      speechQueue.current = speechQueue.current.then(() => say(text, id, false, undefined, opts.listenAfter ?? false)).catch(() => {});
-    },
-    [push, say],
-  );
-
   /** Carries on from a voice sign-up: greet by name and start listing the first harvest, hands-free. */
   const beginJourney = useCallback(
     (name: string) => {
@@ -419,8 +395,6 @@ export function useFarmerFriend({ autoVoice, intercept }: { autoVoice: boolean; 
 
   return {
     lang,
-    /** The language replies are spoken in (English when this device has no voice for `lang`). */
-    speakLang,
     messages,
     avatar,
     word,
@@ -450,7 +424,6 @@ export function useFarmerFriend({ autoVoice, intercept }: { autoVoice: boolean; 
     tapToHear,
     shutdown,
     announce,
-    agentSay,
     beginJourney,
     onPhoto,
     updateCard,

@@ -48,7 +48,7 @@ export function IndicativeTag({ className }: { className?: string }) {
   );
 }
 
-const FLAGS = ["bruising", "rot_spots", "mould", "mixed_sizes", "wilting", "minor_blemishes", "low_light", "blurry_photo", "overexposed", "not_produce", "not_detectable", "crop_mismatch", "crop_unconfirmed", "multiple_items", "stock_photo"];
+const FLAGS = ["bruising", "rot_spots", "mould", "mixed_sizes", "wilting", "minor_blemishes", "low_light", "blurry_photo", "not_produce"];
 
 /**
  * Human label for a quality flag code.

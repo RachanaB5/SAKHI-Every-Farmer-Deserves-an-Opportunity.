@@ -43,10 +43,6 @@ export const UTTERANCES: Utterance[] = [
   { lang: "hi", text: "पचास किलो टमाटर, पच्चीस रुपये किलो, आज तोड़े", intent: "CREATE_LISTING_DRAFT", entities: { crop: "tomato", qty: 50, unit: "kg", price: 25, harvestDate: TODAY } },
   { lang: "hi", text: "मुझे डेढ़ सौ किलो प्याज बेचना है", intent: "CREATE_LISTING_DRAFT", entities: { crop: "onion", qty: 150 } },
   { lang: "hi", text: "50 kilo tamatar, 25 rupaye kilo", intent: "CREATE_LISTING_DRAFT", entities: { crop: "tomato", qty: 50, price: 25 } },
-  // English numbers in the middle of Hindi, as the Hindi recogniser writes them
-  { lang: "hi", text: "फिफ्टी किलो टमाटर ट्वेंटी फाइव रुपीस किलो", intent: "CREATE_LISTING_DRAFT", entities: { crop: "tomato", qty: 50, price: 25 } },
-  { lang: "hi", text: "टू हंड्रेड किलो प्याज बेचना है, थर्टी रुपये किलो", intent: "CREATE_LISTING_DRAFT", entities: { crop: "onion", qty: 200, price: 30 } },
-  { lang: "hi", text: "मुझे forty किलो आलू बेचना है twenty rupees किलो", intent: "CREATE_LISTING_DRAFT", entities: { crop: "potato", qty: 40, price: 20 } },
   { lang: "hi", text: "do quintal aloo bechna hai tees rupaye kilo", intent: "CREATE_LISTING_DRAFT", entities: { crop: "potato", qty: 200, price: 30 } },
   { lang: "hi", text: "kal tode 40 kilo gajar", intent: "CREATE_LISTING_DRAFT", entities: { crop: "carrot", qty: 40, harvestDate: YESTERDAY } },
   { lang: "hi", text: "इस हफ्ते मैंने कितना कमाया?", intent: "CHECK_EARNINGS", entities: { period: "week" } },
@@ -68,7 +64,6 @@ export const UTTERANCES: Utterance[] = [
   // ── Kannada (script, romanised and code-mixed) ──────────────────────
   { lang: "kn", text: "ಐವತ್ತು ಕಿಲೋ ಟೊಮೇಟೊ, ಕಿಲೋಗೆ ಇಪ್ಪತ್ತೈದು ರೂಪಾಯಿ", intent: "CREATE_LISTING_DRAFT", entities: { crop: "tomato", qty: 50, unit: "kg", price: 25 } },
   { lang: "kn", text: "ನೂರು ಕೆಜಿ ಈರುಳ್ಳಿ ಮಾರಾಟ ಮಾಡಬೇಕು", intent: "CREATE_LISTING_DRAFT", entities: { crop: "onion", qty: 100 } },
-  { lang: "kn", text: "ಫಿಫ್ಟಿ ಕಿಲೋ ಟೊಮೇಟೊ, ಕಿಲೋಗೆ ಟ್ವೆಂಟಿ ಫೈವ್ ರೂಪಾಯಿ", intent: "CREATE_LISTING_DRAFT", entities: { crop: "tomato", qty: 50, price: 25 } },
   { lang: "kn", text: "ಇಂದು ಕೊಯ್ದ ಮೂವತ್ತು ಕಿಲೋ ಆಲೂಗಡ್ಡೆ", intent: "CREATE_LISTING_DRAFT", entities: { crop: "potato", qty: 30, harvestDate: TODAY } },
   { lang: "kn", text: "aivattu kilo tomato ippattaidu rupayi", intent: "CREATE_LISTING_DRAFT", entities: { crop: "tomato", qty: 50, price: 25 } },
   { lang: "kn", text: "50 kg eerulli kilo ge 30 rupees", intent: "CREATE_LISTING_DRAFT", entities: { crop: "onion", qty: 50, price: 30 } },

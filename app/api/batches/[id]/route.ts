@@ -1,9 +1,8 @@
 // /api/batches/[id]
 //   GET   one batch (owner or admin)
-//   PATCH  update details while editable, or submit for admin review
-//   DELETE remove the harvest (or take its listing down once it went live)
+//   PATCH update details while editable, or submit for admin review
 import { handler } from "@/lib/api";
-import { loadBatch, removeOwnBatch, serializeBatch, submitBatch, updateDraftBatch } from "@/lib/batches";
+import { loadBatch, serializeBatch, submitBatch, updateDraftBatch } from "@/lib/batches";
 import { batchUpdateSchema, type BatchUpdate } from "@/lib/validators/batch";
 
 type Params = { id: string };
@@ -24,6 +23,3 @@ export const PATCH = handler<BatchUpdate, undefined, Params>({ roles: ["FARMER"]
   if (action === "save") return serializeBatch(await updateDraftBatch(user, params.id, fields));
   return serializeBatch((await submitBatch(user, params.id, fields)).batch);
 });
-
-/** Deletes a harvest that never went live; a live one has its listing removed instead. */
-export const DELETE = handler<undefined, undefined, Params>({ roles: ["FARMER"] }, async ({ user, params }) => removeOwnBatch(user, params.id));

@@ -88,11 +88,7 @@ export async function checkPrice(user: User, e: Entities, lang: AssistantLang): 
 }
 
 export async function checkStatus(user: User, e: Entities, lang: AssistantLang): Promise<AssistantReply> {
-  const batches = await db.batch.findMany({
-    where: { farmerId: user.id, ...(e.crop && { crop: e.crop }), OR: [{ listing: { is: null } }, { listing: { status: { not: "REMOVED" } } }] },
-    orderBy: { createdAt: "desc" },
-    take: 8,
-  });
+  const batches = await db.batch.findMany({ where: { farmerId: user.id, ...(e.crop && { crop: e.crop }) }, orderBy: { createdAt: "desc" }, take: 8 });
   const card = { type: "status" as const, rows: batches.map((b) => ({ batchId: b.id, crop: b.crop, status: b.status, note: b.adminNote, createdAt: b.createdAt.toISOString() })) };
   if (!batches.length) return reply("CHECK_LISTING_STATUS", lang, "ff.say.status.none");
   if (e.crop) {

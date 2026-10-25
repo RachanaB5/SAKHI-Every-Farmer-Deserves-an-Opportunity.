@@ -68,14 +68,20 @@ export function serializeOrder(o: OrderRow, viewer: Pick<User, "id" | "role">) {
       (isFarmer || isAdmin) && o.settlement
         ? { status: o.settlement.status, gross: o.settlement.gross, platformFee: o.settlement.platformFee, deliveryCost: o.settlement.deliveryCost, net: o.settlement.net, settledAt: o.settlement.settledAt?.toISOString() ?? null }
         : null,
-    feedback: o.feedback && {
-      rating: o.feedback.rating,
-      issue: o.feedback.issue,
-      comment: o.feedback.comment,
-      photoUrl: o.feedback.photoUrl,
-      listingId: o.feedback.listingId,
-      photoVerdict: o.feedback.photoVerdict,
-    },
+    feedback:
+      o.feedback &&
+      (() => {
+        const photoUrls = Array.isArray(o.feedback.photoUrls)
+          ? o.feedback.photoUrls.filter((url): url is string => typeof url === "string")
+          : [];
+        return {
+          rating: o.feedback.rating,
+          issue: o.feedback.issue,
+          comment: o.feedback.comment,
+          photoUrl: o.feedback.photoUrl,
+          photoUrls: photoUrls.length ? photoUrls : o.feedback.photoUrl ? [o.feedback.photoUrl] : [],
+        };
+      })(),
     delivery: o.delivery && {
       id: o.delivery.id,
       mode: o.delivery.mode,
@@ -85,8 +91,6 @@ export function serializeOrder(o: OrderRow, viewer: Pick<User, "id" | "role">) {
       otpActive: Boolean(o.delivery.otpHash && o.delivery.otpExpiresAt && o.delivery.otpExpiresAt > new Date()),
       otpExpiresAt: o.delivery.otpExpiresAt?.toISOString() ?? null,
       otpAttempts: o.delivery.otpAttempts,
-      farmEta: o.delivery.farmEta?.toISOString() ?? null,
-      arrivedAt: o.delivery.arrivedAt?.toISOString() ?? null,
       verifiedAt: o.delivery.verifiedAt?.toISOString() ?? null,
       worker: o.delivery.worker && { id: o.delivery.worker.id, name: o.delivery.worker.name, phone: isBuyer || isFarmer || isAdmin || isRider ? `+91 ${o.delivery.worker.phone}` : mask(o.delivery.worker.phone) },
     },

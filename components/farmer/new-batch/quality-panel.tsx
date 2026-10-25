@@ -1,11 +1,9 @@
 // Visual quality check inside the harvest wizard: idle prompt → scanning
-// animation over the frames → score gauge, grade, flags and summary, plus
-// what the photos look like (with a one-tap fix when they don't match the
-// crop) and a reminder that a blurry or dark photo never lowers the grade.
+// animation over the frames → score gauge, grade, flags and summary.
 // Always labelled as a visual assessment, never a certification.
 "use client";
 
-import { AlertTriangle, Camera, CheckCircle2, RotateCw, ScanEye, ScanSearch, Sparkles, Users } from "lucide-react";
+import { CheckCircle2, RotateCw, ScanEye, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -13,30 +11,18 @@ import { AISourceBadge, QualityDisclaimer, flagLabel } from "@/components/ai/ai-
 import { ScoreGauge } from "@/components/ai/score-gauge";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { Button } from "@/components/ui/button";
-import { cropName, isCropSlug, type CropSlug } from "@/lib/crops";
 import { sendJSON } from "@/lib/fetcher";
-import { cn } from "@/lib/utils";
 import type { UploadTile } from "./types";
 
 export interface QualityState {
-  /** null when the photos couldn't be graded ("not detectable"). */
-  score: number | null;
-  grade: "A" | "B" | "C" | null;
+  score: number;
+  grade: "A" | "B" | "C";
   flags: string[];
   summary: string;
   disclaimer: string;
   source: "ai" | "fallback";
   note?: string;
-  /** 0–1 trust in the score (photo sharpness / light). */
-  confidence?: number;
-  /** What the photos show, e.g. "tomato" or "cauliflower". */
-  detected?: { label: string; crop: string | null } | null;
-  match?: "match" | "mismatch" | "unsure" | null;
 }
-
-/** Freshness of these can't be judged from a photo; customer reviews set the grade. */
-const REVIEW_LED = ["milk", "eggs", "chicken"];
-const PHOTO_FLAGS = ["blurry_photo", "low_light", "overexposed"];
 
 const SCAN_STEPS = ["batch.scan1", "batch.scan2", "batch.scan3", "batch.scan4"] as const;
 
@@ -50,17 +36,11 @@ export function QualityPanel({
   tiles,
   result,
   onResult,
-  crop,
-  onUseCrop,
 }: {
   batchId: string | null;
   tiles: UploadTile[];
   result: QualityState | null;
   onResult: (r: QualityState) => void;
-  /** Crop the farmer chose (to explain a mismatch). */
-  crop?: CropSlug | null;
-  /** Switches the harvest to the crop the photos show. */
-  onUseCrop?: (crop: CropSlug) => void;
 }) {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
@@ -88,7 +68,7 @@ export function QualityPanel({
         <Scanning key="scan" previews={stills.map((s) => s.previewUrl)} label={t("batch.analysing")} />
       ) : result ? (
         <motion.div key="result" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <QualityCard result={result} onRerun={run} crop={crop} onUseCrop={onUseCrop} />
+          <QualityCard result={result} onRerun={run} />
         </motion.div>
       ) : (
         <motion.div
@@ -168,58 +148,21 @@ function Scanning({ previews, label }: { previews: string[]; label: string }) {
 /**
  * Result card (also used compactly on the Review step).
  * @param onRerun - optional re-check button
- * @param crop - the crop the farmer chose
- * @param onUseCrop - offered when the photos look like a different catalogue crop
  */
-export function QualityCard({
-  result,
-  onRerun,
-  compact = false,
-  crop,
-  onUseCrop,
-}: {
-  result: QualityState;
-  onRerun?: () => void;
-  compact?: boolean;
-  crop?: CropSlug | null;
-  onUseCrop?: (crop: CropSlug) => void;
-}) {
+export function QualityCard({ result, onRerun, compact = false }: { result: QualityState; onRerun?: () => void; compact?: boolean }) {
   const { t, lang } = useI18n();
-  const seen = result.detected ? (isCropSlug(result.detected.label) ? cropName(result.detected.label, lang) : result.detected.label.replace(/_/g, " ")) : null;
-  const chosen = crop ? cropName(crop, lang) : null;
-  const switchTo = result.match === "mismatch" && result.detected?.crop && isCropSlug(result.detected.crop) ? result.detected.crop : null;
-  const photoIssue = result.flags.some((f) => PHOTO_FLAGS.includes(f));
   return (
     <div className="rounded-3xl border bg-card p-5">
       <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-        {result.score !== null ? (
-          <ScoreGauge score={result.score} size={compact ? 104 : 132} label={t("batch.outOf100")} />
-        ) : (
-          <span className={cn("grid shrink-0 place-items-center rounded-full border-4 border-dashed border-muted-foreground/30 text-muted-foreground", compact ? "size-26" : "size-33")}>
-            <ScanSearch className="size-9" />
-          </span>
-        )}
+        <ScoreGauge score={result.score} size={compact ? 104 : 132} label={t("batch.outOf100")} />
         <div className="min-w-0 flex-1 text-center sm:text-left">
           <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-            {result.grade ? (
-              <>
-                <span className="grid size-9 place-items-center rounded-xl bg-foreground text-lg font-semibold text-background">{result.grade}</span>
-                <span className="text-sm font-medium">{t("common.grade", { grade: result.grade })}</span>
-              </>
-            ) : (
-              <span className="text-lg font-semibold">{t(result.source === "fallback" ? "vision.unavailable" : "vision.notDetectable")}</span>
-            )}
+            <span className="grid size-9 place-items-center rounded-xl bg-foreground text-lg font-semibold text-background">{result.grade}</span>
+            <span className="text-sm font-medium">{t("common.grade", { grade: result.grade })}</span>
             <AISourceBadge source={result.source} />
           </div>
-          {result.score === null && lang !== "en" && <p className="mt-3 text-sm text-muted-foreground">{t(result.source === "fallback" ? "vision.unavailableHelp" : "vision.notDetectableHelp")}</p>}
           {/* The summary is written in English; the score, grade and flags carry the result in other languages. */}
           {lang === "en" && <p className="mt-3 text-[15px] leading-relaxed">{result.summary}</p>}
-          {result.match === "match" && chosen && (
-            <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-success/12 px-2.5 py-1 text-xs font-medium text-success">
-              <CheckCircle2 className="size-3.5" /> {t("vision.matches", { crop: chosen })}
-            </p>
-          )}
-          {result.match === "unsure" && chosen && <p className="mt-3 text-sm text-muted-foreground">{t("vision.unsure", { crop: chosen })}</p>}
           <div className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
             {result.flags.length === 0 ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-success/12 px-2.5 py-1 text-xs font-medium text-success">
@@ -227,7 +170,7 @@ export function QualityCard({
               </span>
             ) : (
               result.flags.map((f) => (
-                <span key={f} className={cn("rounded-full px-2.5 py-1 text-xs font-medium", PHOTO_FLAGS.includes(f) ? "bg-muted" : "bg-warning/18")}>
+                <span key={f} className="rounded-full bg-warning/18 px-2.5 py-1 text-xs font-medium">
                   {flagLabel(f, t)}
                 </span>
               ))
@@ -235,35 +178,6 @@ export function QualityCard({
           </div>
         </div>
       </div>
-      {result.flags.includes("stock_photo") && (
-        <p role="alert" className="mt-4 flex items-start gap-2 rounded-2xl border border-warning/50 bg-warning/10 p-3 text-sm font-medium">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" /> {t("vision.stock")}
-        </p>
-      )}
-      {result.match === "mismatch" && seen && chosen && !result.flags.includes("stock_photo") && (
-        <div role="alert" className="mt-4 rounded-2xl border border-warning/50 bg-warning/10 p-3 text-sm">
-          <p className="flex items-start gap-2 font-medium">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" /> {t("vision.mismatch", { seen, crop: chosen })}
-          </p>
-          <p className="mt-1 pl-6 text-muted-foreground">{t("vision.mismatchHelp", { crop: chosen })}</p>
-          {switchTo && onUseCrop && (
-            <Button type="button" size="sm" variant="outline" className="mt-2 ml-6" onClick={() => onUseCrop(switchTo)}>
-              {t("vision.useCrop", { crop: cropName(switchTo, lang) })}
-            </Button>
-          )}
-        </div>
-      )}
-      {crop && REVIEW_LED.includes(crop) ? (
-        <p className="mt-4 flex items-start gap-2 rounded-2xl bg-muted/60 p-3 text-sm">
-          <Users className="mt-0.5 size-4 shrink-0" /> {t("vision.reviewsDecide", { crop: cropName(crop, lang) })}
-        </p>
-      ) : (
-        photoIssue && (
-          <p className="mt-4 flex items-start gap-2 rounded-2xl bg-muted/60 p-3 text-sm">
-            <Camera className="mt-0.5 size-4 shrink-0" /> {t("vision.photoNote")}
-          </p>
-        )
-      )}
       <div className="mt-4 flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
         <QualityDisclaimer />
         {onRerun && (

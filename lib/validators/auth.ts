@@ -1,4 +1,4 @@
-// Zod schemas for the auth API (login, register, phone codes, PIN reset, demo persona switch).
+// Zod schemas for the auth API (login, register, demo persona switch).
 import { z } from "zod";
 import { phoneSchema, pinSchema, roleSchema, langSchema } from "./common";
 
@@ -28,16 +28,6 @@ export const registerSchema = z
     message: "Village is required for farmers",
     path: ["village"],
   });
-
-export const codePurposeSchema = z.enum(["SIGNUP", "RESET"]);
-
-export const phoneCodeRequestSchema = z.object({ phone: phoneSchema, purpose: codePurposeSchema });
-export const phoneCodeCheckSchema = z.object({ phone: phoneSchema, purpose: codePurposeSchema, code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code") });
-export const resetPinSchema = z.object({ phone: phoneSchema, pin: pinSchema });
-
-export type PhoneCodeRequest = z.infer<typeof phoneCodeRequestSchema>;
-export type PhoneCodeCheck = z.infer<typeof phoneCodeCheckSchema>;
-export type ResetPinInput = z.infer<typeof resetPinSchema>;
 
 export const demoLoginSchema = z.object({
   role: roleSchema.optional(),

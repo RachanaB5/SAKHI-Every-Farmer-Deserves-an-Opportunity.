@@ -13,14 +13,14 @@ import type { SerializedListing } from "@/lib/listings";
 import { cn } from "@/lib/utils";
 import { AddToCart } from "./add-to-cart";
 
-/** Small ring showing the live quality score (photo check moved by customer reviews). */
+/** Small ring showing the visual score. */
 export function QualityRing({ score, className }: { score: number | null; className?: string }) {
   if (score === null) return null;
   const r = 9;
   const c = 2 * Math.PI * r;
   const color = score >= 85 ? "var(--lime)" : score >= 70 ? "var(--warning)" : "var(--tomato)";
   return (
-    <span className={cn("glass inline-flex h-7 items-center gap-1.5 rounded-full pr-2.5 pl-1 text-xs font-semibold", className)} title="Quality score from the photo check and customer reviews (not a certification)">
+    <span className={cn("glass inline-flex h-7 items-center gap-1.5 rounded-full pr-2.5 pl-1 text-xs font-semibold", className)} title="Visual assessment score (not a certification)">
       <svg viewBox="0 0 24 24" className="size-5 -rotate-90">
         <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="3" />
         <circle cx="12" cy="12" r={r} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - score / 100)} />
@@ -45,7 +45,7 @@ export function ListingCard({ listing, href, bulk = false, index = 0 }: { listin
       whileHover={{ y: -4 }}
       className="group relative flex flex-col overflow-hidden rounded-3xl border bg-card transition-shadow hover:shadow-[0_24px_50px_-28px_rgba(0,0,0,0.35)]"
     >
-      <Link href={href} className="absolute inset-0 z-0" aria-label={`${listing.title} by ${listing.farmer.name}`} />
+      <Link href={href} className="absolute inset-0 z-10" aria-label={`${listing.title} by ${listing.farmer.name}`} />
       <div data-fly-from className="relative aspect-[4/3] overflow-hidden bg-muted">
         {listing.imageUrl && (
           <MediaImage
@@ -83,7 +83,7 @@ export function ListingCard({ listing, href, bulk = false, index = 0 }: { listin
               {low ? `Only ${listing.availableQty} left` : `${listing.availableQty} ${listing.unit} left`}
             </p>
           </div>
-          <AddToCart listing={listing} bulk={bulk} className="relative z-10" />
+          <AddToCart listing={listing} bulk={bulk} className="relative z-20" />
         </div>
       </div>
     </motion.article>

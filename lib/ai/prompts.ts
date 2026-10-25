@@ -13,20 +13,16 @@ function plainWords(lang: Lang): string {
 
 const JSON_RULE = "Respond with a single JSON object only, no markdown, no commentary. Never use em dashes in any text you write.";
 
-export const photoCheckPrompt = {
-  system: `You check the photos a farmer uploaded to sell a harvest on an Indian farm-to-table marketplace: what they really show, and how the produce looks.
-You give a VISUAL assessment only; you cannot judge taste, pesticide residue or food safety, and must not claim to.
-Judge the content, never the photography: do not reward bright, vivid or professional photos, and do not mark produce down because a photo is dark or blurry. When you can't tell, say so rather than guess. ${JSON_RULE}`,
-  user: (declared: string | null, labels: readonly string[], frames: number) =>
-    `The farmer says these ${frames} photo(s) show: ${declared ?? "(nothing declared)"}.
-Return JSON: {"scene": "single_produce"|"mixed_produce"|"not_produce"|"unclear", "detected": one of [${labels.join(", ")}] or null, "showsDeclared": true|false|null, "stockOrCollage": boolean, "condition": integer 0-100 or null, "flags": string[], "summary": string}
-- scene: single_produce when one kind of produce is clearly the subject (eggs, milk and raw chicken count); mixed_produce when several kinds are shown with none dominant (a mixed crate, a market stall, a collage); not_produce when no produce is the subject; unclear when the photos are too dark, blurry or far away to tell what they show
-- detected: the main item, only from the list; null when unclear or mixed
-- showsDeclared: true only when the declared item is clearly the main subject; false when the photos mainly show something else or a mix; null when nothing was declared
-- stockOrCollage: true only with clear evidence the image isn't the farmer's own photo of this harvest: a collage or grid of several pictures, a watermark, text, logo or price overlay, an advert layout, a screenshot, an obviously AI-generated image, or a studio product shot on a plain seamless background. A sharp, well-lit, nicely framed photo is NOT evidence on its own: many farmers have good phones
-- condition: how fresh and sound the main produce visibly is (95 = perfect, 85 = good, 70 = fair with some defects, 50 = poor, 30 = rotting). null when you can't judge it from these photos (unclear, not produce, sealed milk, eggs in shell, packaged items)
-- flags only from: ${QUALITY_FLAGS.join(", ")}. Visible produce defects, plus multiple_items for a mix and stock_photo when stockOrCollage
-- summary: one or two plain sentences a farmer and a buyer can both understand, describing what the photos show and the colour, firmness cues, uniformity and any defects you can SEE`,
+export const qualityPrompt = {
+  system: `You inspect photos of freshly harvested produce for an Indian farm-to-table marketplace.
+You give a VISUAL assessment only, you cannot judge taste, pesticide residue, or food safety, and must not claim to.
+Be conservative: if photos are dark, blurry, or not produce, say so via flags and lower the score. ${JSON_RULE}`,
+  user: (crop: string | null, frames: number) =>
+    `Assess these ${frames} photo(s)${crop ? ` of ${crop}` : ""}.
+Return JSON: {"score": integer 0-100, "grade": "A"|"B"|"C", "flags": string[], "summary": string}
+- grade A ≥ 85, B 70–84, C < 70
+- flags only from: ${QUALITY_FLAGS.join(", ")}
+- summary: one or two plain sentences a farmer and a buyer can both understand, describing colour, firmness cues, uniformity and any defects you can SEE.`,
 };
 
 export const parseListingPrompt = {

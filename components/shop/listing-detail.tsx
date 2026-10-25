@@ -3,7 +3,7 @@
 // card, and more from this farmer / similar listings.
 "use client";
 
-import { ArrowLeft, BadgeCheck, MapPin, Repeat, Star, Timer, TrendingUp, Truck, Users } from "lucide-react";
+import { ArrowLeft, BadgeCheck, MapPin, Repeat, Star, Timer, TrendingUp, Truck } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -160,32 +160,18 @@ export function ListingDetail({ id, backHref = "/shop", detailBase = "/shop/list
       </div>
 
       <div className="mt-8 grid gap-5 lg:grid-cols-2">
-        {data.quality.photoScore !== null ? (
-          <div className="grid content-start gap-3">
-            {data.quality.reviews > 0 && data.quality.score !== null && (
-              <div className="flex items-center gap-3 rounded-3xl border bg-card p-4">
-                <Users className="size-5 shrink-0 text-muted-foreground" />
-                <p className="text-sm">
-                  <span className="font-semibold">
-                    Grade {data.quality.grade} · score {data.quality.score}
-                  </span>{" "}
-                  now, from the photo check plus {data.quality.reviews} customer review{data.quality.reviews === 1 ? "" : "s"}
-                  {data.quality.complaints > 0 && ` (${data.quality.complaints} reported a problem)`}.
-                </p>
-              </div>
-            )}
-            <QualityCard
-              compact
-              result={{
-                score: data.quality.photoScore,
-                grade: (data.quality.photoGrade as "A" | "B" | "C") ?? "B",
-                flags: data.quality.flags,
-                summary: data.quality.summary ?? "",
-                disclaimer: QUALITY_DISCLAIMER,
-                source: data.quality.source === "ai" ? "ai" : "fallback",
-              }}
-            />
-          </div>
+        {data.quality.score !== null ? (
+          <QualityCard
+            compact
+            result={{
+              score: data.quality.score,
+              grade: (data.quality.grade as "A" | "B" | "C") ?? "B",
+              flags: data.quality.flags,
+              summary: data.quality.summary ?? "",
+              disclaimer: QUALITY_DISCLAIMER,
+              source: data.quality.source === "ai" ? "ai" : "fallback",
+            }}
+          />
         ) : (
           <div />
         )}

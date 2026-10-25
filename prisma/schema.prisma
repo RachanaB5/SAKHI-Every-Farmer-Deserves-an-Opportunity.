@@ -39,8 +39,6 @@ enum ListingStatus {
   ACTIVE
   PAUSED
   SOLD_OUT
-  /// Taken down by the farmer. Kept (never deleted) so past orders and reviews still resolve.
-  REMOVED
 }
 
 enum OrderType {
@@ -124,8 +122,6 @@ model User {
   googleId         String?  @unique
   /// scrypt hash of the 4–6 digit login PIN (lib/auth/password.ts)
   pinHash          String
-  /// When the phone number was last proven with a texted code (sign-up, PIN reset)
-  phoneVerifiedAt  DateTime?
   role             Role
   /// UI language: en | hi | kn | ta | te
   language         String   @default("en")
@@ -159,7 +155,6 @@ model User {
   feedback       Feedback[]
   auditLogs      AuditLog[]
   paymentIntents PaymentIntent[]
-  notifications  Notification[]
 
   @@index([role])
 }
@@ -178,9 +173,6 @@ model FarmerProfile {
   assistantWelcomeSeen Boolean @default(false)
   /// Sakhi: speak the welcome / replies automatically
   assistantAutoVoice   Boolean @default(true)
-  /// Sakhi runs the farmer's orders: books riders, announces who is coming
-  /// and when, and records handovers (lib/assistant/autopilot.ts)
-  assistantAutopilot   Boolean @default(false)
 }
 
 /// One row per confirmed Sakhi action, keyed by the confirm
@@ -219,13 +211,6 @@ model Batch {
   aiSummary       String?
   /// "ai" when a model produced the assessment, "fallback" for the deterministic mock
   aiSource        String?
-  /// What the vision model sees in the photos (a model label, e.g. "tomato", "cauliflower")
-  aiDetectedCrop  String?
-  /// match | mismatch | unsure: the declared crop vs what the photos show
-  aiCropMatch     String?
-  /// 0–1: how far the photo score can be trusted (sharpness, light, crop type).
-  /// Never lowers the score itself; it sets how quickly reviews can move it.
-  aiConfidence    Float?
   voiceTranscript String?
   inputLanguage   String?
   adminNote       String?
@@ -285,14 +270,7 @@ model Listing {
   minOrderQty    Float         @default(1)
   status         ListingStatus @default(ACTIVE)
   area           String
-  /// Live grade: starts at the approved photo grade, then follows customer reviews (lib/quality)
   grade          String?
-  /// Live 0–100 score: the photo score blended with customer reviews
-  qualityScore   Float?
-  /// Distinct buyers whose review counts towards the score, and how many reported a quality problem
-  reviewCount    Int           @default(0)
-  complaintCount Int           @default(0)
-  gradeUpdatedAt DateTime?
   harvestDate    DateTime
   imageUrl       String?
   createdAt      DateTime      @default(now())
@@ -301,7 +279,6 @@ model Listing {
   orderItems    OrderItem[]
   offers        Offer[]
   subscriptions Subscription[]
-  feedback      Feedback[]
 
   @@index([status, area])
   @@index([crop])
@@ -472,10 +449,6 @@ model Delivery {
   cost             Float          @default(0)
   failureReason    String?
   assignedAt       DateTime?
-  /// When the rider (or, for self-pickup, the buyer) is expected at the farm
-  farmEta          DateTime?
-  /// When the rider (or buyer) said they had reached the farm
-  arrivedAt        DateTime?
   pickedUpAt       DateTime?
   verifiedAt       DateTime?
   createdAt        DateTime       @default(now())
@@ -580,27 +553,18 @@ model Subscription {
 }
 
 model Feedback {
-  id             String   @id @default(cuid())
-  orderId        String   @unique
-  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  buyerId        String
-  buyer          User     @relation(fields: [buyerId], references: [id])
-  /// The item the review is about; null means every item in the order
-  listingId      String?
-  listing        Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
-  rating         Int
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User     @relation(fields: [buyerId], references: [id])
+  rating    Int
   /// NONE | DAMAGED | NOT_FRESH | WRONG_ITEM | SHORT_QTY | LATE
-  issue          String?
-  comment        String?
-  photoUrl       String?
-  /// Vision check of the buyer's photo: model label seen and chance it looks fresh
-  photoCrop      String?
-  photoFreshness Float?
-  /// supports | unclear | contradicts — whether the photo backs the complaint
-  photoVerdict   String?
-  createdAt      DateTime @default(now())
-
-  @@index([listingId])
+  issue     String?
+  comment   String?
+  photoUrl  String?
+  photoUrls Json?
+  createdAt DateTime @default(now())
 }
 
 // ─── Platform ─────────────────────────────────────────────────────────────
@@ -616,39 +580,6 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([entity, entityId])
-}
-
-/// One-time codes texted to prove a phone number (sign-up, PIN reset).
-/// Stored only as an HMAC; 10-minute expiry, 5 tries, single use.
-model PhoneCode {
-  id        String    @id @default(cuid())
-  phone     String
-  /// SIGNUP | RESET
-  purpose   String
-  codeHash  String
-  salt      String
-  attempts  Int       @default(0)
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@index([phone, purpose, createdAt])
-}
-
-/// In-app notices, e.g. "2 customers said your tomatoes weren't fresh".
-/// `type` + `data` are rendered in the reader's language on the client.
-model Notification {
-  id        String    @id @default(cuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// QUALITY_COMPLAINT | GRADE_DOWN | GRADE_UP
-  type      String
-  data      Json
-  link      String?
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@index([userId, createdAt])
 }
 
 /// Mandi-style daily reference prices (₹/kg) used by the price advisor.

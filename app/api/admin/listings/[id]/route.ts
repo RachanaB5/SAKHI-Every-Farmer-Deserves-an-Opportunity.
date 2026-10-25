@@ -13,7 +13,6 @@ const body = z.object({ status: z.enum(["ACTIVE", "PAUSED"]), reason: z.string()
 export const PATCH = handler<z.infer<typeof body>, undefined, Params>({ roles: ["ADMIN"], body }, async ({ user, params, body }) => {
   const listing = await db.listing.findUnique({ where: { id: params.id }, include: { farmer: { select: { suspended: true } } } });
   if (!listing) throw new HttpError(404, "Listing not found");
-  if (listing.status === "REMOVED") throw new HttpError(409, "The farmer removed this listing");
   if (body.status === "ACTIVE" && listing.farmer.suspended) throw new HttpError(400, "Reinstate the farmer before resuming their listings");
   if (body.status === "ACTIVE" && listing.availableQty <= 0) throw new HttpError(400, "Nothing left to sell on this listing");
   await db.listing.update({ where: { id: listing.id }, data: { status: body.status } });
