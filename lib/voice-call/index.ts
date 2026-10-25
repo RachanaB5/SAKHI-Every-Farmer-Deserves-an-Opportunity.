@@ -99,12 +99,17 @@ export async function placeOrderCall(orderId: string): Promise<{ placed: boolean
   const order = await db.order.findUnique({ where: { id: orderId }, select: { farmerId: true, farmer: { select: { phone: true } } } });
   if (!order) return { placed: false, reason: "Order not found" };
   const to = toE164(env("VOICE_CALL_TEST_NUMBER") ?? order.farmer.phone);
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${c.sid}/Calls.json`, {
-    method: "POST",
-    headers: { authorization: `Basic ${Buffer.from(`${c.sid}:${c.token}`).toString("base64")}`, "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ To: to, From: toE164Any(c.from), Url: stepUrl(orderId, "start"), Method: "POST", Timeout: "30" }),
-    signal: AbortSignal.timeout(10_000),
-  });
+  const call = (params: Record<string, string>) =>
+    fetch(`https://api.twilio.com/2010-04-01/Accounts/${c.sid}/Calls.json`, {
+      method: "POST",
+      headers: { authorization: `Basic ${Buffer.from(`${c.sid}:${c.token}`).toString("base64")}`, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ To: to, From: toE164Any(c.from), ...params }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  // Only the essentials: newer Twilio trial accounts refuse optional call parameters.
+  let res = await call({ Url: stepUrl(orderId, "start") });
+  // Some trials refuse a script URL too; then send the opening menu inline (its steps still come back to us).
+  if (res.status === 400) res = await call({ Twiml: languageMenu(stepUrl(orderId, "lang"), stepUrl(orderId, "lang")) });
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as { code?: number; message?: string } | null;
     console.error(`[voice-call] Twilio refused the call (${res.status}):`, err);
