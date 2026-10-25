@@ -50,7 +50,7 @@ export function ListingCard({ listing, href, bulk = false, index = 0 }: { listin
       whileHover={{ y: -4 }}
       className="group relative flex flex-col overflow-hidden rounded-3xl border bg-card transition-shadow hover:shadow-[0_24px_50px_-28px_rgba(0,0,0,0.35)]"
     >
-      <Link href={href} className="absolute inset-0 z-0" aria-label={tx("{item} by {farmer}", { item: name, farmer: listing.farmer.name })} />
+      <Link href={href} className={cn("absolute inset-0", bulk ? "z-0" : "z-10")} aria-label={tx("{item} by {farmer}", { item: name, farmer: listing.farmer.name })} />
       <div data-fly-from className="relative aspect-[4/3] overflow-hidden bg-muted">
         {listing.imageUrl && (
           <MediaImage
@@ -88,7 +88,7 @@ export function ListingCard({ listing, href, bulk = false, index = 0 }: { listin
               {low ? tx("Only {qty} left", { qty: listing.availableQty }) : tx("{qty} {unit} left", { qty: listing.availableQty, unit })}
             </p>
           </div>
-          <AddToCart listing={listing} bulk={bulk} className="relative z-10" />
+          <AddToCart listing={listing} bulk={bulk} className={cn("relative", bulk ? "z-10" : "z-20")} />
         </div>
       </div>
     </motion.article>

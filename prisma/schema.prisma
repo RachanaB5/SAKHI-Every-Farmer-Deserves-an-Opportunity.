@@ -593,6 +593,7 @@ model Feedback {
   issue          String?
   comment        String?
   photoUrl       String?
+  photoUrls      Json?
   /// Vision check of the buyer's photo: model label seen and chance it looks fresh
   photoCrop      String?
   photoFreshness Float?

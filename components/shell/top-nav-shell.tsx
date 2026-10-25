@@ -15,6 +15,7 @@ import { Logo } from "@/components/brand/logo";
 import { SiteFooter } from "@/components/common/site-footer";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { useI18n } from "@/components/providers/i18n-provider";
+import { BuyerFilterButton, BuyerFilterProvider } from "@/components/shop/buyer-filter-context";
 import { LanguageMenu, LanguageSwitch } from "@/components/shell/language-switch";
 import { NotificationBell } from "@/components/shell/notification-bell";
 import { AutoLocation, LocationPicker } from "@/components/shell/location-picker";
@@ -56,11 +57,10 @@ export function TopNavShell({
   village?: string | null;
   children: React.ReactNode;
 }) {
+  const shell = <ShellInner role={role} user={user} village={village}>{children}</ShellInner>;
   return (
     <>
-      <ShellInner role={role} user={user} village={village}>
-        {children}
-      </ShellInner>
+      {role === "CONSUMER" ? <BuyerFilterProvider>{shell}</BuyerFilterProvider> : shell}
       {role === "FARMER" && <FarmerFriend />}
     </>
   );
@@ -96,9 +96,18 @@ function ShellInner({ role, user, village, children }: { role: TopNavRole; user:
             <Logo href={NAV[role][0].href} className="shrink-0" />
             {place && <LocationPicker label={place.label} value={place.value} defaultLabel={role === "FARMER" ? "Farm" : role === "BULK_BUYER" ? "Kitchen" : "Home"} className="hidden lg:flex" />}
             <AutoLocation enabled={role === "CONSUMER" || role === "BULK_BUYER"} />
-            <Suspense fallback={<div className="hidden flex-1 md:block" />}>
-              <SearchBox role={role} items={items} className="hidden flex-1 md:flex" />
-            </Suspense>
+            {role === "CONSUMER" && pathname === "/shop" ? (
+              <div className="hidden min-w-0 flex-1 items-center gap-2 md:flex">
+                <Suspense fallback={<div className="h-11 min-w-0 flex-1" />}>
+                  <SearchBox role={role} items={items} className="flex flex-1" />
+                </Suspense>
+                <BuyerFilterButton />
+              </div>
+            ) : (
+              <Suspense fallback={<div className="hidden flex-1 md:block" />}>
+                <SearchBox role={role} items={items} className="hidden flex-1 md:flex" />
+              </Suspense>
+            )}
             <div className="ml-auto flex items-center gap-1 md:ml-0 md:gap-2">
               <LanguageMenu />
               {role === "FARMER" && <NotificationBell />}
@@ -108,6 +117,16 @@ function ShellInner({ role, user, village, children }: { role: TopNavRole; user:
             </div>
           </div>
         </div>
+        {role === "CONSUMER" && pathname === "/shop" && (
+          <div className="border-b bg-card/95 px-3 py-2 text-foreground backdrop-blur md:hidden">
+            <div className="mx-auto flex max-w-7xl items-center gap-2">
+              <Suspense fallback={<div className="h-11 min-w-0 flex-1" />}>
+                <SearchBox role={role} items={items} className="flex flex-1" />
+              </Suspense>
+              <BuyerFilterButton />
+            </div>
+          </div>
+        )}
         <ServicesBar items={items} active={active} badges={badges} />
       </header>
 
@@ -290,9 +309,11 @@ function MobileMenu({
         </div>
 
         <div className="space-y-6 p-4">
-          <Suspense>
-            <SearchBox role={role} items={items} className="flex" onDone={close} />
-          </Suspense>
+          {role !== "CONSUMER" && (
+            <Suspense>
+              <SearchBox role={role} items={items} className="flex" onDone={close} />
+            </Suspense>
+          )}
 
           <nav aria-label={t("shell.services")}>
             <p className="mb-2 px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t("shell.services")}</p>

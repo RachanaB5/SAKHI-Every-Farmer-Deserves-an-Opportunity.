@@ -9,7 +9,7 @@ import { useSearchParams } from "next/navigation";
 import { useDeferredValue, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { MediaImage } from "@/components/common/media-image";
+import { ReviewImages } from "@/components/common/review-images";
 import { ResponsiveModal } from "@/components/common/responsive-modal";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/common/states";
 import { StatusBadge } from "@/components/common/status-badge";
@@ -195,11 +195,7 @@ function OrderSheet({ orderId, onClose, onChanged }: { orderId: string; onClose:
                 {tx("Buyer feedback")} · {o.feedback.rating}★ {o.feedback.issue && o.feedback.issue !== "NONE" ? `· ${tx(ISSUE_LABEL[o.feedback.issue] ?? o.feedback.issue.replace(/_/g, " ").toLowerCase())}` : ""}
               </p>
               {o.feedback.comment && <p className="mt-1 text-muted-foreground">“{o.feedback.comment}”</p>}
-              {o.feedback.photoUrl && (
-                <div className="relative mt-2 aspect-video w-full max-w-xs overflow-hidden rounded-xl">
-                  <MediaImage src={o.feedback.photoUrl} sizes="320px" />
-                </div>
-              )}
+              <ReviewImages images={o.feedback.photoUrls} label={tx("Review image")} />
             </div>
           )}
           <div>
