@@ -99,17 +99,39 @@ export async function placeOrderCall(orderId: string): Promise<{ placed: boolean
   const order = await db.order.findUnique({ where: { id: orderId }, select: { farmerId: true, farmer: { select: { phone: true } } } });
   if (!order) return { placed: false, reason: "Order not found" };
   const to = toE164(env("VOICE_CALL_TEST_NUMBER") ?? order.farmer.phone);
-  const call = (params: Record<string, string>) =>
-    fetch(`https://api.twilio.com/2010-04-01/Accounts/${c.sid}/Calls.json`, {
+  const auth = `Basic ${Buffer.from(`${c.sid}:${c.token}`).toString("base64")}`;
+  const api = `https://api.twilio.com/2010-04-01/Accounts/${c.sid}`;
+  const call = (from: string, params: Record<string, string>) =>
+    fetch(`${api}/Calls.json`, {
       method: "POST",
-      headers: { authorization: `Basic ${Buffer.from(`${c.sid}:${c.token}`).toString("base64")}`, "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ To: to, From: toE164Any(c.from), ...params }),
+      headers: { authorization: auth, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ To: to, From: from, ...params }),
       signal: AbortSignal.timeout(10_000),
     });
-  // Only the essentials: newer Twilio trial accounts refuse optional call parameters.
-  let res = await call({ Url: stepUrl(orderId, "start") });
-  // Some trials refuse a script URL too; then send the opening menu inline (its steps still come back to us).
-  if (res.status === 400) res = await call({ Twiml: languageMenu(stepUrl(orderId, "lang"), stepUrl(orderId, "lang")) });
+  const attempt = async (from: string) => {
+    // Only the essentials: newer Twilio trial accounts refuse optional call parameters.
+    const res = await call(from, { Url: stepUrl(orderId, "start") });
+    // Some trials refuse a script URL too; then send the opening menu inline (its steps still come back to us).
+    return res.status === 400 ? call(from, { Twiml: languageMenu(stepUrl(orderId, "lang"), stepUrl(orderId, "lang")) }) : res;
+  };
+  const from = toE164Any(c.from);
+  let res = await attempt(from);
+  // Wrong caller number (a trial pairs each verified phone with one of its numbers): try the account's own numbers.
+  const code = res.status === 400 ? ((await res.clone().json().catch(() => null)) as { code?: number } | null)?.code : undefined;
+  if (code && [573003, 21210, 21212, 21606].includes(code)) {
+    const list = (await fetch(`${api}/IncomingPhoneNumbers.json?PageSize=20`, { headers: { authorization: auth }, signal: AbortSignal.timeout(10_000) })
+      .then((r) => r.json())
+      .catch(() => null)) as { incoming_phone_numbers?: { phone_number: string }[] } | null;
+    for (const n of list?.incoming_phone_numbers ?? []) {
+      if (n.phone_number === from) continue;
+      const retry = await attempt(n.phone_number);
+      if (retry.ok) {
+        console.info(`[voice-call] placed from ${n.phone_number}; set TWILIO_FROM to it`);
+        res = retry;
+        break;
+      }
+    }
+  }
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as { code?: number; message?: string } | null;
     console.error(`[voice-call] Twilio refused the call (${res.status}):`, err);
