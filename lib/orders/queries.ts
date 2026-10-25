@@ -73,6 +73,7 @@ export function serializeOrder(o: OrderRow, viewer: Pick<User, "id" | "role">) {
       issue: o.feedback.issue,
       comment: o.feedback.comment,
       photoUrl: o.feedback.photoUrl,
+      photoUrls: Array.isArray(o.feedback.photoUrls) ? o.feedback.photoUrls.filter((url): url is string => typeof url === "string") : o.feedback.photoUrl ? [o.feedback.photoUrl] : [],
       listingId: o.feedback.listingId,
       photoVerdict: o.feedback.photoVerdict,
     },
