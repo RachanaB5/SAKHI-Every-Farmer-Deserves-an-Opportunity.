@@ -68,6 +68,26 @@ export function toE164(phone: string): string {
   return `+91${d.slice(-10)}`;
 }
 
+/** A Twilio number as +E.164 (spaces and dashes removed; "+" added when missing). */
+const toE164Any = (n: string) => {
+  const d = n.replace(/[^d+]/g, "");
+  return d.startsWith("+") ? d : `+${d}`;
+};
+
+/** Twilio's refusal in words that say what to fix. */
+function twilioReason(code: number | undefined, message: string): string {
+  const fix: Record<number, string> = {
+    21219: "Verify this phone number in Twilio first (trial accounts can only call verified numbers).",
+    21215: "Allow India in Twilio → Voice → Geo permissions.",
+    21408: "Allow India in Twilio → Voice → Geo permissions.",
+    21210: "TWILIO_FROM must be your Twilio phone number, like +14155550123.",
+    21212: "TWILIO_FROM must be your Twilio phone number, like +14155550123.",
+    21211: "The farmer's phone number is not valid. Check VOICE_CALL_TEST_NUMBER (like +919876543210).",
+    21205: "NEXT_PUBLIC_APP_URL must be your public https site address.",
+  };
+  return `${(code && fix[code]) || "The phone service refused the call."} (Twilio ${code ?? ""}: ${message})`;
+}
+
 /**
  * Rings the farmer about an order.
  * VOICE_CALL_TEST_NUMBER sends every call to one phone instead (a Twilio
@@ -82,13 +102,13 @@ export async function placeOrderCall(orderId: string): Promise<{ placed: boolean
   const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${c.sid}/Calls.json`, {
     method: "POST",
     headers: { authorization: `Basic ${Buffer.from(`${c.sid}:${c.token}`).toString("base64")}`, "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ To: to, From: c.from, Url: stepUrl(orderId, "start"), Method: "POST", Timeout: "30" }),
+    body: new URLSearchParams({ To: to, From: toE164Any(c.from), Url: stepUrl(orderId, "start"), Method: "POST", Timeout: "30" }),
     signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) {
-    const detail = (await res.text().catch(() => "")).slice(0, 300);
-    console.error(`[voice-call] Twilio refused the call (${res.status}): ${detail}`);
-    return { placed: false, reason: `The phone service refused the call (${res.status}).` };
+    const err = (await res.json().catch(() => null)) as { code?: number; message?: string } | null;
+    console.error(`[voice-call] Twilio refused the call (${res.status}):`, err);
+    return { placed: false, reason: twilioReason(err?.code, err?.message ?? `HTTP ${res.status}`) };
   }
   await db.auditLog.create({ data: { action: "ORDER_CALL_PLACED", entity: "Order", entityId: orderId, meta: { to: `${to.slice(0, 5)}xxxxx${to.slice(-2)}` } } });
   return { placed: true };
