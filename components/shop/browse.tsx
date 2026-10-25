@@ -4,6 +4,7 @@
 
 import { ArrowUpRight, Leaf, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useDeferredValue, useMemo, useState } from "react";
 import useSWR from "swr";
 import { MediaImage } from "@/components/common/media-image";
@@ -19,6 +20,7 @@ import { useLive } from "@/hooks/use-live";
 import type { SerializedListing } from "@/lib/listings";
 import { PHOTOS } from "@/lib/photos";
 import { cn } from "@/lib/utils";
+import { DEFAULT_FILTERS, useBuyerFilters, type Filters, type Sort } from "./buyer-filter-context";
 import { CartBar } from "./cart-bar";
 import { ListingCard } from "./listing-card";
 
@@ -28,13 +30,6 @@ export interface CategoryChip {
   available: boolean;
 }
 
-type Sort = "nearest" | "price" | "fresh" | "quality";
-interface Filters {
-  sort: Sort;
-  maxPrice: number | null;
-  freshDays: number | null;
-  gradeA: boolean;
-}
 /** Category card photos: brand photography where we have it, seed crop photos otherwise. */
 const CATEGORY_PHOTO: Record<string, { src: string; cls?: string }> = {
   "": { src: PHOTOS["veg-basket"].src },
@@ -45,7 +40,6 @@ const CATEGORY_PHOTO: Record<string, { src: string; cls?: string }> = {
   eggs: { src: "/seed/eggs-1.jpg" },
   poultry: { src: "/seed/chicken-1.jpg" },
 };
-const DEFAULTS: Filters = { sort: "nearest", maxPrice: null, freshDays: null, gradeA: false };
 const SORTS: { key: Sort; label: string }[] = [
   { key: "nearest", label: "Nearest farm" },
   { key: "fresh", label: "Freshest harvest" },
@@ -79,11 +73,18 @@ export function Browse({
   initialQuery?: string;
 }) {
   const { tx } = useI18n();
+  const router = useRouter();
   const [q, setQ] = useState(initialQuery);
   const query = useDeferredValue(q.trim());
   const [category, setCategory] = useState("");
-  const [filters, setFilters] = useState<Filters>(DEFAULTS);
-  const [sheet, setSheet] = useState(false);
+  const buyerFilters = useBuyerFilters();
+  const [localFilters, setLocalFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [localSheet, setLocalSheet] = useState(false);
+  const filters = buyerFilters?.filters ?? localFilters;
+  const setFilters = buyerFilters?.setFilters ?? setLocalFilters;
+  const sheet = buyerFilters?.sheetOpen ?? localSheet;
+  const setSheet = buyerFilters?.setSheetOpen ?? setLocalSheet;
+  const activeCount = Number(filters.sort !== "nearest") + Number(Boolean(filters.maxPrice)) + Number(Boolean(filters.freshDays)) + Number(filters.gradeA);
 
   const key = useMemo(() => {
     const p = new URLSearchParams();
@@ -98,7 +99,6 @@ export function Browse({
   const { data, error, isLoading, mutate } = useSWR<SerializedListing[]>(key, { keepPreviousData: true });
   useLive(["inventory.updated"], () => mutate());
 
-  const activeCount = Number(filters.sort !== "nearest") + Number(Boolean(filters.maxPrice)) + Number(Boolean(filters.freshDays)) + Number(filters.gradeA);
   const blocked = categories.find((c) => c.slug === category && !c.available);
 
   return (
@@ -113,21 +113,23 @@ export function Browse({
       />
       {top}
 
-      <div className="flex gap-2">
-        <label className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tx("Search crops or farmers")} className="pl-10" aria-label={tx("Search")} />
-          {q && (
-            <button type="button" onClick={() => setQ("")} className="absolute top-1/2 right-2 grid size-8 -translate-y-1/2 place-items-center rounded-full hover:bg-muted" aria-label={tx("Clear search")}>
-              <X className="size-4" />
-            </button>
-          )}
-        </label>
-        <Button variant="outline" size="icon" onClick={() => setSheet(true)} aria-label={tx("Filters")} className="relative shrink-0">
-          <SlidersHorizontal />
-          {activeCount > 0 && <span className="absolute -top-1 -right-1 grid size-5 place-items-center rounded-full bg-lime text-[11px] font-bold text-lime-foreground">{activeCount}</span>}
-        </Button>
-      </div>
+      {!buyerFilters && (
+        <div className="flex gap-2">
+          <label className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tx("Search crops or farmers")} className="pl-10" aria-label={tx("Search")} />
+            {q && (
+              <button type="button" onClick={() => setQ("")} className="absolute top-1/2 right-2 grid size-8 -translate-y-1/2 place-items-center rounded-full hover:bg-muted" aria-label={tx("Clear search")}>
+                <X className="size-4" />
+              </button>
+            )}
+          </label>
+          <Button variant="outline" size="icon" onClick={() => setSheet(true)} aria-label={tx("Filters")} className="relative shrink-0">
+            <SlidersHorizontal />
+            {activeCount > 0 && <span className="absolute -top-1 -right-1 grid size-5 place-items-center rounded-full bg-lime text-[11px] font-bold text-lime-foreground">{activeCount}</span>}
+          </Button>
+        </div>
+      )}
 
       <div role="group" aria-label={tx("Categories")} className="-mx-4 mt-4 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
         {[{ slug: "", name: "All", available: true }, ...categories].map((c) => {
@@ -185,11 +187,28 @@ export function Browse({
         ) : error ? (
           <ErrorState message={error.message} onRetry={() => mutate()} />
         ) : data && data.length === 0 ? (
-          <EmptyState icon={Search} title="Nothing matches yet" body="Try another search or clear the filters." action={<Button variant="outline" onClick={() => { setQ(""); setFilters(DEFAULTS); setCategory(""); }}>{tx("Clear all")}</Button>} />
+          <EmptyState
+            icon={Search}
+            title={tx("Nothing matches yet")}
+            body={tx("Try another search or clear the filters.")}
+            action={
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setQ("");
+                  if (buyerFilters) router.push("/shop");
+                  setFilters(DEFAULT_FILTERS);
+                  setCategory("");
+                }}
+              >
+                {tx("Clear all")}
+              </Button>
+            }
+          />
         ) : (
           <>
             <p className="mb-3 text-sm text-muted-foreground">
-              {tx(data?.length === 1 ? "{n} listing" : "{n} listings", { n: data?.length ?? 0 })} · {tx("admin-verified harvests only")}
+              {data?.length} listing{data?.length === 1 ? "" : "s"} · admin-verified harvests only
             </p>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
               {data?.map((l, i) => (
@@ -210,7 +229,7 @@ function FilterSheet({ open, onOpenChange, value, onApply }: { open: boolean; on
   const { tx } = useI18n();
   const [draft, setDraft] = useState(value);
   return (
-    <ResponsiveModal open={open} onOpenChange={(o) => { if (o) setDraft(value); onOpenChange(o); }} title="Filter & sort">
+    <ResponsiveModal open={open} onOpenChange={(o) => { if (o) setDraft(value); onOpenChange(o); }} title={tx("Filter & sort")}>
       <div className="space-y-6">
         <div>
           <p className="mb-2 text-sm font-medium">{tx("Sort by")}</p>
@@ -249,7 +268,7 @@ function FilterSheet({ open, onOpenChange, value, onApply }: { open: boolean; on
         <div>
           <div className="mb-3 flex justify-between text-sm">
             <span className="font-medium">{tx("Max price")}</span>
-            <span className="tabular text-muted-foreground">{draft.maxPrice ? tx("₹{price}/unit", { price: draft.maxPrice }) : tx("No limit")}</span>
+            <span className="tabular text-muted-foreground">{draft.maxPrice ? `₹${draft.maxPrice}/unit` : "No limit"}</span>
           </div>
           <Slider min={10} max={300} step={5} value={[draft.maxPrice ?? 300]} onValueChange={([v]) => setDraft({ ...draft, maxPrice: v >= 300 ? null : v })} />
         </div>
@@ -258,7 +277,7 @@ function FilterSheet({ open, onOpenChange, value, onApply }: { open: boolean; on
           <Switch checked={draft.gradeA} onCheckedChange={(c) => setDraft({ ...draft, gradeA: c })} />
         </label>
         <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" size="lg" onClick={() => setDraft(DEFAULTS)}>
+          <Button variant="outline" size="lg" onClick={() => setDraft(DEFAULT_FILTERS)}>
             {tx("Reset")}
           </Button>
           <Button size="lg" onClick={() => onApply(draft)}>
